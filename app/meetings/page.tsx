@@ -38,7 +38,7 @@ export default async function MeetingsPage() {
     .eq('is_active', true)
 
   const chapters = memberships?.map(m => m.chapters).filter(Boolean) || []
-  const chapterIds = chapters.map(c => c.id)
+  const chapterIds = chapters.map((c: any) => c.id)
 
   // Fetch all meetings for user's chapters - use DISTINCT to avoid duplicates
   const { data: upcomingMeetings } = chapterIds.length > 0 ? await supabase
@@ -81,7 +81,7 @@ export default async function MeetingsPage() {
             {uniqueUpcoming.length > 0 ? (
               <div className="grid gap-4">
                 {uniqueUpcoming.map((meeting: any) => {
-                  const chapter = chapters.find((c: any) => c.id === meeting.chapter_id)
+                  const chapter: any = chapters.find((c: any) => c.id === meeting.chapter_id)
                   const date = new Date(meeting.scheduled_datetime)
                   return (
                     <Card key={meeting.id}>
@@ -117,7 +117,7 @@ export default async function MeetingsPage() {
             {uniquePast.length > 0 ? (
               <div className="grid gap-4">
                 {uniquePast.map((meeting: any) => {
-                  const chapter = chapters.find((c: any) => c.id === meeting.chapter_id)
+                  const chapter: any = chapters.find((c: any) => c.id === meeting.chapter_id)
                   const date = new Date(meeting.scheduled_datetime)
                   const outcome = getRandomOutcome()
                   return (

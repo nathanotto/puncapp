@@ -288,7 +288,7 @@ export default async function ChapterCommitmentsPage({ params }: PageProps) {
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <Badge variant="success">Completed</Badge>
-                        <Badge variant="neutral" size="small">{commitment.commitment_type.replace('_', ' ')}</Badge>
+                        <Badge variant="neutral">{commitment.commitment_type.replace('_', ' ')}</Badge>
                       </div>
                       <p className="font-semibold text-sm">{commitment.description}</p>
                       {commitment.recipient && (

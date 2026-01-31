@@ -52,7 +52,7 @@ export default async function MeetingDetailPage({ params }: PageProps) {
   }
 
   // Get user's attendance record
-  const userAttendance = meeting.attendance?.find(a => a.user_id === profile.id)
+  const userAttendance = meeting.attendance?.find((a: any) => a.user_id === profile.id)
 
   // Check if user has submitted feedback
   const { data: existingFeedback } = await supabase
@@ -91,13 +91,13 @@ export default async function MeetingDetailPage({ params }: PageProps) {
 
   // Count RSVPs
   const rsvpCounts = {
-    yes: meeting.attendance?.filter(a => a.rsvp_status === 'yes').length || 0,
-    no: meeting.attendance?.filter(a => a.rsvp_status === 'no').length || 0,
-    maybe: meeting.attendance?.filter(a => a.rsvp_status === 'maybe').length || 0,
-    no_response: meeting.attendance?.filter(a => a.rsvp_status === 'no_response').length || 0,
+    yes: meeting.attendance?.filter((a: any) => a.rsvp_status === 'yes').length || 0,
+    no: meeting.attendance?.filter((a: any) => a.rsvp_status === 'no').length || 0,
+    maybe: meeting.attendance?.filter((a: any) => a.rsvp_status === 'maybe').length || 0,
+    no_response: meeting.attendance?.filter((a: any) => a.rsvp_status === 'no_response').length || 0,
   }
 
-  const checkedInCount = meeting.attendance?.filter(a => a.checked_in_at).length || 0
+  const checkedInCount = meeting.attendance?.filter((a: any) => a.checked_in_at).length || 0
 
   return (
     <div className="min-h-screen bg-warm-cream">
@@ -312,13 +312,13 @@ export default async function MeetingDetailPage({ params }: PageProps) {
                 <h4 className="font-semibold mb-3">Who Attended</h4>
                 <div className="space-y-2">
                   {meeting.attendance
-                    ?.filter(a => a.checked_in_at)
-                    .map(a => (
+                    ?.filter((a: any) => a.checked_in_at)
+                    .map((a: any) => (
                       <div key={a.user_id} className="flex items-center justify-between">
                         <span className="text-stone-gray">
                           {a.users?.display_preference === 'real_name' ? a.users.name : a.users?.username}
                         </span>
-                        <Badge variant="info" size="small">
+                        <Badge variant="info">
                           {a.attendance_type === 'in_person' ? 'In Person' : 'Video'}
                         </Badge>
                       </div>

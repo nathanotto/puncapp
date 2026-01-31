@@ -21,7 +21,7 @@ export default async function CommitmentsPage() {
     .eq('is_active', true)
 
   const chapters = memberships?.map(m => m.chapters).filter(Boolean) || []
-  const chapterIds = chapters.map(c => c.id)
+  const chapterIds = chapters.map((c: any) => c.id)
 
   // Fetch active commitments
   const { data: activeCommitments } = chapterIds.length > 0 ? await supabase

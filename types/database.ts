@@ -44,6 +44,7 @@ export interface User {
   leader_certified: boolean
   leader_certification_date: string | null
   leader_certification_expiry: string | null
+  is_admin: boolean
   created_at: string
   updated_at: string
 }

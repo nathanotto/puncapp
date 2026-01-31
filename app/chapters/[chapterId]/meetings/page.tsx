@@ -329,7 +329,7 @@ export default async function ChapterMeetingsPage({ params }: PageProps) {
             <div className="grid gap-3">
               {upcomingMeetings.slice(1).map(meeting => {
                 const date = new Date(meeting.scheduled_datetime)
-                const userAttendance = meeting.attendance?.find(a => a.user_id === profile.id)
+                const userAttendance = meeting.attendance?.find((a: any) => a.user_id === profile.id)
 
                 return (
                   <Card key={meeting.id} hover>
@@ -347,7 +347,7 @@ export default async function ChapterMeetingsPage({ params }: PageProps) {
                           <Badge variant={
                             userAttendance.rsvp_status === 'yes' ? 'success' :
                             userAttendance.rsvp_status === 'no' ? 'error' : 'warning'
-                          } size="small" className="mt-1">
+                          } className="mt-1">
                             {userAttendance.rsvp_status}
                           </Badge>
                         )}
@@ -390,7 +390,7 @@ export default async function ChapterMeetingsPage({ params }: PageProps) {
             <div className="grid gap-3">
               {pastMeetings.map(meeting => {
                 const date = new Date(meeting.scheduled_datetime)
-                const userAttendance = meeting.attendance?.find(a => a.user_id === profile.id)
+                const userAttendance = meeting.attendance?.find((a: any) => a.user_id === profile.id)
                 const outcome = getRandomOutcome()
 
                 return (
@@ -407,11 +407,11 @@ export default async function ChapterMeetingsPage({ params }: PageProps) {
                         </p>
                       </div>
                       <div className="flex gap-2 items-start">
-                        <Badge variant={meeting.status === 'completed' ? 'success' : 'neutral'} size="small">
+                        <Badge variant={meeting.status === 'completed' ? 'success' : 'neutral'}>
                           {meeting.status}
                         </Badge>
                         {userAttendance?.checked_in_at && (
-                          <Badge variant="info" size="small">Attended</Badge>
+                          <Badge variant="info">Attended</Badge>
                         )}
                       </div>
                     </div>

@@ -18,7 +18,7 @@ export default async function CreateMeetingPage({ params }: PageProps) {
   // Check if user is a leader of this chapter
   const { data: role } = await supabase
     .from('chapter_roles')
-    .select('role_type, chapters(name)')
+    .select('role_type')
     .eq('chapter_id', chapterId)
     .eq('user_id', profile.id)
     .in('role_type', ['Chapter Leader', 'Backup Leader'])
@@ -27,6 +27,13 @@ export default async function CreateMeetingPage({ params }: PageProps) {
   if (!role) {
     notFound()
   }
+
+  // Get chapter name
+  const { data: chapter } = await supabase
+    .from('chapters')
+    .select('name')
+    .eq('id', chapterId)
+    .single()
 
   // Fetch available curriculum modules
   const { data: modules } = await supabase
@@ -70,7 +77,7 @@ export default async function CreateMeetingPage({ params }: PageProps) {
             ← Back to Meetings
           </Link>
           <h1 className="text-3xl font-bold">Schedule New Meeting</h1>
-          <p className="text-warm-cream/80 text-sm mt-1">{role.chapters?.name}</p>
+          <p className="text-warm-cream/80 text-sm mt-1">{chapter?.name}</p>
         </div>
       </header>
 

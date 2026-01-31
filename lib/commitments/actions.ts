@@ -123,7 +123,7 @@ export async function updateCommitmentStatus(
     await checkDiscrepancy(commitmentId)
   }
 
-  revalidatePath(`/chapters/${commitment.chapters.id}`)
+  revalidatePath(`/chapters/${commitment.chapter_id}`)
   revalidatePath('/dashboard')
 
   return { success: true }
@@ -175,7 +175,7 @@ export async function updateRecipientStatus(
   // Check for discrepancy
   await checkDiscrepancy(commitmentId)
 
-  revalidatePath(`/chapters/${commitment.chapters.id}`)
+  revalidatePath(`/chapters/${commitment.chapter_id}`)
   revalidatePath('/dashboard')
 
   return { success: true }
@@ -260,7 +260,7 @@ export async function resolveDiscrepancy(
     return { success: false, error: error.message }
   }
 
-  revalidatePath(`/chapters/${commitment.chapters.id}`)
+  revalidatePath(`/chapters/${commitment.chapter_id}`)
   revalidatePath('/dashboard')
 
   return { success: true }
@@ -315,7 +315,7 @@ export async function completeCommitmentWithComment(
     await checkDiscrepancy(commitmentId)
   }
 
-  revalidatePath(`/chapters/${commitment.chapters.id}`)
+  revalidatePath(`/chapters/${commitment.chapter_id}`)
   revalidatePath('/dashboard')
   revalidatePath('/commitments')
 
@@ -370,7 +370,7 @@ export async function deleteCommitment(commitmentId: string) {
     return { success: false, error: error.message }
   }
 
-  revalidatePath(`/chapters/${commitment.chapters.id}`)
+  revalidatePath(`/chapters/${commitment.chapter_id}`)
   revalidatePath('/dashboard')
 
   return { success: true }

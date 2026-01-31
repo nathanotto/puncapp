@@ -29,7 +29,7 @@ export default async function DashboardPage() {
     .eq('user_id', profile.id)
 
   // Fetch upcoming meetings for user's chapters
-  const chapterIds = chapters.map(c => c.id)
+  const chapterIds = chapters.map((c: any) => c.id)
   const { data: meetings } = chapterIds.length > 0 ? await supabase
     .from('meetings')
     .select('id, chapter_id, scheduled_datetime, topic, status')
@@ -148,7 +148,7 @@ export default async function DashboardPage() {
             {meetings && meetings.length > 0 ? (
               <div className="space-y-2">
                 {meetings.map((meeting: any) => {
-                  const chapter = chapters.find((c: any) => c.id === meeting.chapter_id)
+                  const chapter: any = chapters.find((c: any) => c.id === meeting.chapter_id)
                   const date = new Date(meeting.scheduled_datetime)
                   return (
                     <Link
