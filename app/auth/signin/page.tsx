@@ -29,20 +29,43 @@ export default function SignInPage() {
     setError(null)
     setLoading(true)
 
-    const { user, error: signInError } = await signIn({
-      email: formData.email,
-      password: formData.password,
-    })
+    try {
+      console.log('Attempting sign in...')
 
-    setLoading(false)
+      // Add timeout to prevent hanging forever
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Sign in request timed out. Please check your connection and try again.')), 15000)
+      )
 
-    if (signInError) {
-      setError(signInError)
-      return
+      const signInPromise = signIn({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      const { user, error: signInError } = await Promise.race([signInPromise, timeoutPromise]) as any
+
+      console.log('Sign in result:', { user: !!user, error: signInError })
+
+      if (signInError) {
+        setError(signInError)
+        setLoading(false)
+        return
+      }
+
+      if (!user) {
+        setError('Sign in failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Success! Redirect to dashboard
+      console.log('Sign in successful, redirecting...')
+      router.push('/dashboard')
+    } catch (err: any) {
+      console.error('Sign in error:', err)
+      setError(err.message || 'An unexpected error occurred. Please try again.')
+      setLoading(false)
     }
-
-    // Success! Redirect to dashboard
-    router.push('/dashboard')
   }
 
   return (

@@ -60,18 +60,37 @@ export async function signUp(data: SignUpData) {
  * Sign in an existing user
  */
 export async function signIn(data: SignInData) {
-  const supabase = createClient()
+  try {
+    // Check if Supabase is configured
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error('Supabase environment variables not configured')
+      return { user: null, error: 'Application not properly configured. Please contact support.' }
+    }
 
-  const { data: authData, error } = await supabase.auth.signInWithPassword({
-    email: data.email,
-    password: data.password,
-  })
+    const supabase = createClient()
 
-  if (error) {
-    return { user: null, error: error.message }
+    console.log('Calling Supabase signInWithPassword...')
+
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password,
+    })
+
+    console.log('Supabase response:', {
+      hasUser: !!authData?.user,
+      error: error?.message,
+      errorCode: error?.status
+    })
+
+    if (error) {
+      return { user: null, error: error.message }
+    }
+
+    return { user: authData.user, error: null }
+  } catch (err: any) {
+    console.error('Sign in exception:', err)
+    return { user: null, error: err.message || 'An unexpected error occurred' }
   }
-
-  return { user: authData.user, error: null }
 }
 
 /**
