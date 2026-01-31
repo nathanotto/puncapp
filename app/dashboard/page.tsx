@@ -1,10 +1,10 @@
 import { requireAuthWithProfile } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { signOut } from '@/lib/auth/client'
+import SideNav from '@/components/layout/SideNav'
 
 export default async function DashboardPage() {
   const profile = await requireAuthWithProfile()
@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   // Fetch user's chapters
   const { data: memberships } = await supabase
     .from('chapter_memberships')
-    .select('chapter_id, chapters(id, name, status, funding_status)')
+    .select('chapter_id, chapters(id, name, status)')
     .eq('user_id', profile.id)
     .eq('is_active', true)
 
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   const chapterIds = chapters.map(c => c.id)
   const { data: meetings } = chapterIds.length > 0 ? await supabase
     .from('meetings')
-    .select('id, chapter_id, scheduled_datetime, topic, status, location')
+    .select('id, chapter_id, scheduled_datetime, topic, status')
     .in('chapter_id', chapterIds)
     .gte('scheduled_datetime', new Date().toISOString())
     .eq('status', 'scheduled')
@@ -41,14 +41,44 @@ export default async function DashboardPage() {
     .from('attendance')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', profile.id)
-    .eq('attendance_type', 'in_person') : { count: 0 }
+    .not('checked_in_at', 'is', null) : { count: 0 }
+
+  // Fetch user's active commitments
+  const { data: activeCommitments } = chapterIds.length > 0 ? await supabase
+    .from('commitments')
+    .select(`
+      id,
+      chapter_id,
+      description,
+      commitment_type,
+      deadline,
+      status,
+      chapters(name)
+    `)
+    .eq('made_by', profile.id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(5) : { data: [] }
+
+  // Fetch completed commitments count
+  const { count: completedCount } = chapterIds.length > 0 ? await supabase
+    .from('commitments')
+    .select('*', { count: 'exact', head: true })
+    .eq('made_by', profile.id)
+    .eq('status', 'completed') : { count: 0 }
+
+  const now = new Date()
 
   return (
-    <div className="min-h-screen bg-warm-cream">
-      {/* Header */}
-      <header className="bg-deep-charcoal text-warm-cream py-6 px-6">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div>
+    <div className="min-h-screen bg-warm-cream md:flex">
+      {/* Side Navigation */}
+      <SideNav />
+
+      {/* Main Content Area */}
+      <div className="flex-1 w-full">
+        {/* Header */}
+        <header className="bg-deep-charcoal text-warm-cream py-4 px-6 md:px-6 pl-16 md:pl-6">
+          <div className="max-w-6xl mx-auto">
             <h1 className="text-2xl font-bold">
               {profile.display_preference === 'real_name' ? profile.name : profile.username}
             </h1>
@@ -56,27 +86,12 @@ export default async function DashboardPage() {
               {profile.status === 'unassigned' ? 'Not yet in a chapter' : 'Chapter Member'}
             </p>
           </div>
-          <form action={async () => {
-            'use server'
-            const { createClient } = await import('@/lib/supabase/server')
-            const supabase = await createClient()
-            await supabase.auth.signOut()
-            redirect('/auth/signin')
-          }}>
-            <Button type="submit" variant="secondary" size="small">
-              Sign Out
-            </Button>
-          </form>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto py-12 px-6">
+        {/* Main Content */}
+        <main className="max-w-6xl mx-auto py-8 px-6">
         {/* Status Badge */}
-        <div className="mb-8">
-          {profile.status === 'unassigned' && (
-            <Badge variant="warning">Unassigned - No Chapter Yet</Badge>
-          )}
+        <div className="mb-6">
           {profile.status === 'assigned' && (
             <Badge variant="success">Active Chapter Member</Badge>
           )}
@@ -85,114 +100,18 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Welcome Message */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-earth-brown mb-4">
-            Welcome to PUNC Chapters
-          </h2>
-          <p className="text-lg text-stone-gray">
-            Your chapter management dashboard. This is where you'll see your upcoming meetings, commitments, and chapter information.
-          </p>
-        </div>
-
-        {/* Profile Card */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <Card>
-            <h3 className="text-xl font-semibold mb-4">Your Profile</h3>
-            <dl className="space-y-3">
-              <div>
-                <dt className="text-sm font-semibold text-stone-gray">Name</dt>
-                <dd className="text-base">{profile.name}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-semibold text-stone-gray">Username</dt>
-                <dd className="text-base">@{profile.username}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-semibold text-stone-gray">Email</dt>
-                <dd className="text-base">{profile.email}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-semibold text-stone-gray">Phone</dt>
-                <dd className="text-base">{profile.phone}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-semibold text-stone-gray">Address</dt>
-                <dd className="text-base">{profile.address}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-semibold text-stone-gray">Display Preference</dt>
-                <dd className="text-base capitalize">{profile.display_preference.replace('_', ' ')}</dd>
-              </div>
-            </dl>
-          </Card>
-
-          <Card>
-            <h3 className="text-xl font-semibold mb-4">Getting Started</h3>
-            <div className="space-y-4">
-              {profile.status === 'unassigned' ? (
-                <>
-                  <p className="text-stone-gray">
-                    You're not yet in a chapter. Here's what you can do:
-                  </p>
-                  <ul className="space-y-2 text-stone-gray">
-                    <li className="flex items-start">
-                      <span className="text-burnt-orange mr-2">•</span>
-                      <span>Search for existing chapters near you</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-burnt-orange mr-2">•</span>
-                      <span>Join a forming chapter in your area</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-burnt-orange mr-2">•</span>
-                      <span>Request a new chapter to be formed</span>
-                    </li>
-                  </ul>
-                  <Button variant="primary" fullWidth disabled>
-                    Find Chapters (Coming Soon)
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p className="text-stone-gray">
-                    You're all set! Features coming soon:
-                  </p>
-                  <ul className="space-y-2 text-stone-gray">
-                    <li className="flex items-start">
-                      <span className="text-burnt-orange mr-2">•</span>
-                      <span>View upcoming meetings</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-burnt-orange mr-2">•</span>
-                      <span>RSVP to meetings</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-burnt-orange mr-2">•</span>
-                      <span>Track your commitments</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-burnt-orange mr-2">•</span>
-                      <span>View chapter members</span>
-                    </li>
-                  </ul>
-                </>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        {/* Chapters */}
+        {/* Your Chapters - Now at top */}
         {chapters.length > 0 && (
-          <div className="mb-8">
+          <div className="mb-6">
             <h2 className="text-2xl font-bold text-earth-brown mb-4">Your Chapters</h2>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-4">
               {chapters.map((chapter: any) => {
                 const userRole = roles?.find(r => r.chapter_id === chapter.id)
+                const nextMeeting = meetings?.find((m: any) => m.chapter_id === chapter.id)
                 return (
                   <Card key={chapter.id}>
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-xl font-semibold">{chapter.name}</h3>
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="text-lg font-semibold">{chapter.name}</h3>
                       <Badge variant={chapter.status === 'open' ? 'success' : 'warning'}>
                         {chapter.status}
                       </Badge>
@@ -200,9 +119,18 @@ export default async function DashboardPage() {
                     {userRole && (
                       <Badge variant="info" className="mb-3">{userRole.role_type}</Badge>
                     )}
-                    <div className="space-y-2 text-sm text-stone-gray">
-                      <p>Funding Status: <span className="font-semibold capitalize">{chapter.funding_status.replace('_', ' ')}</span></p>
-                    </div>
+                    {nextMeeting ? (
+                      <p className="text-sm text-stone-gray mb-3">
+                        Next meeting: {new Date(nextMeeting.scheduled_datetime).toLocaleDateString()} at {new Date(nextMeeting.scheduled_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-stone-gray mb-3">No meeting scheduled</p>
+                    )}
+                    <Link href={`/chapters/${chapter.id}/meetings`}>
+                      <Button variant="secondary" size="small" fullWidth>
+                        View Meetings
+                      </Button>
+                    </Link>
                   </Card>
                 )
               })}
@@ -210,23 +138,27 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Feature Cards */}
-        <div className="grid md:grid-cols-3 gap-6">
+        {/* Feature Cards - More Dense */}
+        <div className="grid md:grid-cols-3 gap-4">
           <Card>
-            <h3 className="text-xl font-semibold mb-4">Upcoming Meetings</h3>
+            <h3 className="text-lg font-semibold mb-3">Upcoming Meetings</h3>
             {meetings && meetings.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {meetings.map((meeting: any) => {
                   const chapter = chapters.find((c: any) => c.id === meeting.chapter_id)
                   const date = new Date(meeting.scheduled_datetime)
                   return (
-                    <div key={meeting.id} className="border-l-4 border-burnt-orange pl-3">
+                    <Link
+                      key={meeting.id}
+                      href={`/chapters/${meeting.chapter_id}/meetings/${meeting.id}`}
+                      className="block border-l-4 border-burnt-orange pl-2 hover:bg-warm-cream/50 transition-colors rounded-r py-1"
+                    >
                       <p className="font-semibold text-sm">{meeting.topic}</p>
                       <p className="text-xs text-stone-gray">{chapter?.name}</p>
                       <p className="text-xs text-stone-gray">
                         {date.toLocaleDateString()} at {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
-                    </div>
+                    </Link>
                   )
                 })}
               </div>
@@ -236,29 +168,54 @@ export default async function DashboardPage() {
           </Card>
 
           <Card>
-            <h3 className="text-xl font-semibold mb-4">Your Stats</h3>
-            <div className="space-y-3">
+            <h3 className="text-lg font-semibold mb-3">Your Stats</h3>
+            <div className="space-y-2">
               <div>
                 <p className="text-2xl font-bold text-earth-brown">{chapters.length}</p>
-                <p className="text-sm text-stone-gray">Active Chapters</p>
+                <p className="text-xs text-stone-gray">Active Chapters</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-earth-brown">{attendanceCount || 0}</p>
-                <p className="text-sm text-stone-gray">Meetings Attended</p>
+                <p className="text-xs text-stone-gray">Meetings Attended</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-earth-brown">{meetings?.length || 0}</p>
-                <p className="text-sm text-stone-gray">Upcoming Meetings</p>
+                <p className="text-2xl font-bold text-earth-brown">{completedCount || 0}</p>
+                <p className="text-xs text-stone-gray">Completed Commitments</p>
               </div>
             </div>
           </Card>
 
-          <Card className="opacity-50">
-            <h3 className="text-xl font-semibold mb-2">My Commitments</h3>
-            <p className="text-sm text-stone-gray">Coming in Phase 2</p>
+          <Card>
+            <h3 className="text-lg font-semibold mb-3">My Commitments</h3>
+            {activeCommitments && activeCommitments.length > 0 ? (
+              <div className="space-y-2">
+                {activeCommitments.map((commitment: any) => {
+                  const deadline = commitment.deadline ? new Date(commitment.deadline) : null
+                  const isOverdue = deadline && deadline < now
+                  return (
+                    <Link
+                      key={commitment.id}
+                      href={`/chapters/${commitment.chapter_id}/commitments`}
+                      className="block border-l-4 border-burnt-orange pl-2 hover:bg-warm-cream/50 transition-colors rounded-r py-1"
+                    >
+                      <p className="font-semibold text-sm line-clamp-2">{commitment.description}</p>
+                      <p className="text-xs text-stone-gray">{commitment.chapters?.name}</p>
+                      {deadline && (
+                        <p className={`text-xs ${isOverdue ? 'text-burnt-orange font-semibold' : 'text-stone-gray'}`}>
+                          {isOverdue ? 'Overdue: ' : 'Due: '}{deadline.toLocaleDateString()}
+                        </p>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-stone-gray">No active commitments</p>
+            )}
           </Card>
         </div>
       </main>
+      </div>
     </div>
   )
 }
