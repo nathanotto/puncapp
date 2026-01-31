@@ -1,26 +1,141 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* PUNC Brand Colors - Earth Tones */
+  --earth-brown: #8B6F47;
+  --warm-cream: #F5F1E8;
+  --deep-charcoal: #2B2621;
+  --stone-gray: #A39B8F;
+
+  /* Accent Colors */
+  --burnt-orange: #D97532;
+  --forest-green: #4A5D4A;
+  --burnt-amber: #D4A74E;
+  --rust-red: #B34A3C;
+
+  /* Semantic Colors */
+  --success: #5A7A5A;
+  --warning: #D4A74E;
+  --error: #B34A3C;
+  --info: #8B6F47;
+
+  /* Neutral Colors */
+  --white: #FFFFFF;
+  --border-light: #D9D1C5;
+  --bg-subtle: #E5DFD5;
+
+  /* Base tokens */
+  --background: var(--warm-cream);
+  --foreground: var(--deep-charcoal);
 }
 
 @theme inline {
+  /* Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-earth-brown: var(--earth-brown);
+  --color-warm-cream: var(--warm-cream);
+  --color-deep-charcoal: var(--deep-charcoal);
+  --color-stone-gray: var(--stone-gray);
+
+  --color-burnt-orange: var(--burnt-orange);
+  --color-forest-green: var(--forest-green);
+  --color-burnt-amber: var(--burnt-amber);
+  --color-rust-red: var(--rust-red);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  --color-white: var(--white);
+  --color-border-light: var(--border-light);
+  --color-bg-subtle: var(--bg-subtle);
+
+  /* Typography */
+  --font-heading: var(--font-heading);
+  --font-body: var(--font-body);
+  --font-ui: var(--font-ui);
+
+  /* Spacing Scale */
+  --spacing-xs: 0.25rem;    /* 4px */
+  --spacing-sm: 0.5rem;     /* 8px */
+  --spacing-md: 1rem;       /* 16px */
+  --spacing-lg: 1.5rem;     /* 24px */
+  --spacing-xl: 2.5rem;     /* 40px */
+  --spacing-2xl: 3.75rem;   /* 60px */
+
+  /* Border Radius */
+  --radius-sm: 0.25rem;     /* 4px - subtle, not too rounded */
+  --radius-md: 0.375rem;    /* 6px - cards */
+  --radius-lg: 0.75rem;     /* 12px - badges */
+
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-button: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography Defaults */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading), Georgia, serif;
+  font-weight: 700;
+  color: var(--earth-brown);
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: 2.25rem; /* 36px */
+  letter-spacing: -0.031rem; /* -0.5px */
+}
+
+h2 {
+  font-size: 1.75rem; /* 28px */
+  letter-spacing: -0.019rem; /* -0.3px */
+}
+
+h3 {
+  font-size: 1.375rem; /* 22px */
+  font-weight: 600;
+}
+
+h4 {
+  font-size: 1.125rem; /* 18px */
+  font-weight: 600;
+}
+
+/* Button defaults */
+button {
+  font-family: var(--font-ui), sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease-in-out;
+}
+
+/* Link defaults */
+a {
+  color: var(--earth-brown);
+  text-decoration: none;
+  transition: all 150ms ease-in-out;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--earth-brown);
+  outline-offset: 2px;
 }
