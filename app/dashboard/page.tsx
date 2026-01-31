@@ -10,6 +10,9 @@ export default async function DashboardPage() {
   const profile = await requireAuthWithProfile()
   const supabase = await createClient()
 
+  // Check if user is admin
+  const isAdmin = profile.is_admin || false
+
   // Fetch user's chapters
   const { data: memberships } = await supabase
     .from('chapter_memberships')
@@ -72,7 +75,7 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-warm-cream md:flex">
       {/* Side Navigation */}
-      <SideNav />
+      <SideNav isAdmin={isAdmin} />
 
       {/* Main Content Area */}
       <div className="flex-1 w-full">

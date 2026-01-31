@@ -4,10 +4,14 @@ import Link from 'next/link'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import SideNav from '@/components/layout/SideNav'
+import CompleteCommitmentForm from '@/components/commitments/CompleteCommitmentForm'
 
 export default async function CommitmentsPage() {
   const profile = await requireAuthWithProfile()
   const supabase = await createClient()
+
+  // Check if user is admin
+  const isAdmin = profile.is_admin || false
 
   // Fetch user's chapters
   const { data: memberships } = await supabase
@@ -57,7 +61,7 @@ export default async function CommitmentsPage() {
 
   return (
     <div className="min-h-screen bg-warm-cream md:flex">
-      <SideNav />
+      <SideNav isAdmin={isAdmin} />
 
       <div className="flex-1 w-full">
         <header className="bg-deep-charcoal text-warm-cream py-4 px-6 md:px-6 pl-16 md:pl-6">
@@ -78,24 +82,23 @@ export default async function CommitmentsPage() {
                   const isOverdue = deadline && deadline < now
                   return (
                     <Card key={commitment.id}>
-                      <Link href={`/chapters/${commitment.chapter_id}/commitments`}>
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold mb-1">{commitment.description}</h3>
-                            <p className="text-sm text-stone-gray mb-2">{commitment.chapters?.name}</p>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="info">
-                                {commitment.commitment_type.replace('_', ' ')}
-                              </Badge>
-                              {deadline && (
-                                <span className={`text-sm ${isOverdue ? 'text-burnt-orange font-semibold' : 'text-stone-gray'}`}>
-                                  {isOverdue ? 'Overdue: ' : 'Due: '}{deadline.toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                      <div>
+                        <h3 className="text-lg font-semibold mb-1">{commitment.description}</h3>
+                        <p className="text-sm text-stone-gray mb-2">{commitment.chapters?.name}</p>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge variant="info">
+                            {commitment.commitment_type.replace('_', ' ')}
+                          </Badge>
+                          {deadline && (
+                            <span className={`text-sm ${isOverdue ? 'text-burnt-orange font-semibold' : 'text-stone-gray'}`}>
+                              {isOverdue ? 'Overdue: ' : 'Due: '}{deadline.toLocaleDateString()}
+                            </span>
+                          )}
                         </div>
-                      </Link>
+
+                        {/* Complete commitment form */}
+                        <CompleteCommitmentForm commitmentId={commitment.id} />
+                      </div>
                     </Card>
                   )
                 })}

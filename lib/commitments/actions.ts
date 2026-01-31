@@ -267,6 +267,62 @@ export async function resolveDiscrepancy(
 }
 
 /**
+ * Complete a commitment with a comment
+ */
+export async function completeCommitmentWithComment(
+  commitmentId: string,
+  comment: string
+) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Get the commitment to check if user is the maker
+  const { data: commitment } = await supabase
+    .from('commitments')
+    .select('*, chapters(id)')
+    .eq('id', commitmentId)
+    .single()
+
+  if (!commitment) {
+    return { success: false, error: 'Commitment not found' }
+  }
+
+  if (commitment.made_by !== user.id) {
+    return { success: false, error: 'You can only complete your own commitments' }
+  }
+
+  // Update commitment with completion
+  const { error } = await supabase
+    .from('commitments')
+    .update({
+      self_reported_status: 'completed',
+      status: commitment.recipient_id ? commitment.status : 'completed',
+      completion_comment: comment,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', commitmentId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  // Check for discrepancy if there's a recipient
+  if (commitment.recipient_id) {
+    await checkDiscrepancy(commitmentId)
+  }
+
+  revalidatePath(`/chapters/${commitment.chapters.id}`)
+  revalidatePath('/dashboard')
+  revalidatePath('/commitments')
+
+  return { success: true }
+}
+
+/**
  * Delete a commitment (maker or leader only)
  */
 export async function deleteCommitment(commitmentId: string) {

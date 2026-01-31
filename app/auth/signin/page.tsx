@@ -103,6 +103,12 @@ export default function SignInPage() {
             </p>
           </form>
         </Card>
+
+        <div className="mt-8 text-center">
+          <Link href="/admin/login" className="text-xs text-stone-gray hover:text-earth-brown">
+            Admin login
+          </Link>
+        </div>
       </div>
     </div>
   )

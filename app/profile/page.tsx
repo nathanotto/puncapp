@@ -6,9 +6,12 @@ import SideNav from '@/components/layout/SideNav'
 export default async function ProfilePage() {
   const profile = await requireAuthWithProfile()
 
+  // Check if user is admin
+  const isAdmin = profile.is_admin || false
+
   return (
     <div className="min-h-screen bg-warm-cream md:flex">
-      <SideNav />
+      <SideNav isAdmin={isAdmin} />
 
       <div className="flex-1 w-full">
         <header className="bg-deep-charcoal text-warm-cream py-4 px-6 md:px-6 pl-16 md:pl-6">

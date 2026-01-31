@@ -18,9 +18,14 @@ const navItems: NavItem[] = [
   { label: 'Profile', href: '/profile', icon: '👤' },
 ]
 
-export default function SideNav() {
+interface SideNavProps {
+  isAdmin?: boolean
+}
+
+export default function SideNav({ isAdmin = false }: SideNavProps) {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const isAdminMode = pathname.startsWith('/admin')
 
   const toggleMenu = () => setIsOpen(!isOpen)
   const closeMenu = () => setIsOpen(false)
@@ -90,8 +95,22 @@ export default function SideNav() {
           })}
         </ul>
 
+        {/* Admin Mode Toggle (only for admins) */}
+        {isAdmin && (
+          <div className="mt-auto pt-4 border-t border-warm-cream/20">
+            <Link
+              href={isAdminMode ? '/dashboard' : '/admin'}
+              onClick={closeMenu}
+              className="flex items-center gap-3 px-4 py-2 rounded-md transition-colors text-warm-cream/80 hover:bg-warm-cream/10 hover:text-warm-cream"
+            >
+              <span className="text-lg">{isAdminMode ? '👤' : '⚙️'}</span>
+              <span>{isAdminMode ? 'Switch to User Mode' : 'Switch to Admin Mode'}</span>
+            </Link>
+          </div>
+        )}
+
         {/* Logout at bottom */}
-        <div className="mt-auto pt-4 border-t border-warm-cream/20">
+        <div className={`${isAdmin ? 'pt-2' : 'mt-auto pt-4'} border-t border-warm-cream/20`}>
           <form action={logout}>
             <button
               type="submit"
