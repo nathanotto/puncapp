@@ -1,4 +1,5 @@
 import { requireAuthWithProfile } from '@/lib/auth/server'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -7,6 +8,40 @@ import { signOut } from '@/lib/auth/client'
 
 export default async function DashboardPage() {
   const profile = await requireAuthWithProfile()
+  const supabase = await createClient()
+
+  // Fetch user's chapters
+  const { data: memberships } = await supabase
+    .from('chapter_memberships')
+    .select('chapter_id, chapters(id, name, status, funding_status)')
+    .eq('user_id', profile.id)
+    .eq('is_active', true)
+
+  const chapters = memberships?.map(m => m.chapters).filter(Boolean) || []
+
+  // Fetch user's roles
+  const { data: roles } = await supabase
+    .from('chapter_roles')
+    .select('role_type, chapter_id')
+    .eq('user_id', profile.id)
+
+  // Fetch upcoming meetings for user's chapters
+  const chapterIds = chapters.map(c => c.id)
+  const { data: meetings } = chapterIds.length > 0 ? await supabase
+    .from('meetings')
+    .select('id, chapter_id, scheduled_datetime, topic, status, location')
+    .in('chapter_id', chapterIds)
+    .gte('scheduled_datetime', new Date().toISOString())
+    .eq('status', 'scheduled')
+    .order('scheduled_datetime', { ascending: true })
+    .limit(5) : { data: [] }
+
+  // Fetch user's attendance stats
+  const { count: attendanceCount } = chapterIds.length > 0 ? await supabase
+    .from('attendance')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', profile.id)
+    .eq('attendance_type', 'in_person') : { count: 0 }
 
   return (
     <div className="min-h-screen bg-warm-cream">
@@ -147,21 +182,80 @@ export default async function DashboardPage() {
           </Card>
         </div>
 
-        {/* Feature Placeholder Cards */}
+        {/* Chapters */}
+        {chapters.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-earth-brown mb-4">Your Chapters</h2>
+            <div className="grid md:grid-cols-2 gap-6">
+              {chapters.map((chapter: any) => {
+                const userRole = roles?.find(r => r.chapter_id === chapter.id)
+                return (
+                  <Card key={chapter.id}>
+                    <div className="flex justify-between items-start mb-4">
+                      <h3 className="text-xl font-semibold">{chapter.name}</h3>
+                      <Badge variant={chapter.status === 'open' ? 'success' : 'warning'}>
+                        {chapter.status}
+                      </Badge>
+                    </div>
+                    {userRole && (
+                      <Badge variant="info" className="mb-3">{userRole.role_type}</Badge>
+                    )}
+                    <div className="space-y-2 text-sm text-stone-gray">
+                      <p>Funding Status: <span className="font-semibold capitalize">{chapter.funding_status.replace('_', ' ')}</span></p>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Feature Cards */}
         <div className="grid md:grid-cols-3 gap-6">
-          <Card className="opacity-50">
-            <h3 className="text-xl font-semibold mb-2">Upcoming Meetings</h3>
-            <p className="text-sm text-stone-gray">No meetings scheduled yet</p>
+          <Card>
+            <h3 className="text-xl font-semibold mb-4">Upcoming Meetings</h3>
+            {meetings && meetings.length > 0 ? (
+              <div className="space-y-3">
+                {meetings.map((meeting: any) => {
+                  const chapter = chapters.find((c: any) => c.id === meeting.chapter_id)
+                  const date = new Date(meeting.scheduled_datetime)
+                  return (
+                    <div key={meeting.id} className="border-l-4 border-burnt-orange pl-3">
+                      <p className="font-semibold text-sm">{meeting.topic}</p>
+                      <p className="text-xs text-stone-gray">{chapter?.name}</p>
+                      <p className="text-xs text-stone-gray">
+                        {date.toLocaleDateString()} at {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-stone-gray">No upcoming meetings</p>
+            )}
+          </Card>
+
+          <Card>
+            <h3 className="text-xl font-semibold mb-4">Your Stats</h3>
+            <div className="space-y-3">
+              <div>
+                <p className="text-2xl font-bold text-earth-brown">{chapters.length}</p>
+                <p className="text-sm text-stone-gray">Active Chapters</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-earth-brown">{attendanceCount || 0}</p>
+                <p className="text-sm text-stone-gray">Meetings Attended</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-earth-brown">{meetings?.length || 0}</p>
+                <p className="text-sm text-stone-gray">Upcoming Meetings</p>
+              </div>
+            </div>
           </Card>
 
           <Card className="opacity-50">
             <h3 className="text-xl font-semibold mb-2">My Commitments</h3>
-            <p className="text-sm text-stone-gray">No commitments yet</p>
-          </Card>
-
-          <Card className="opacity-50">
-            <h3 className="text-xl font-semibold mb-2">Curriculum Progress</h3>
-            <p className="text-sm text-stone-gray">Not started</p>
+            <p className="text-sm text-stone-gray">Coming in Phase 2</p>
           </Card>
         </div>
       </main>
