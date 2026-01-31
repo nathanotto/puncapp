@@ -37,6 +37,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${merriweather.variable} ${sourceSans.variable} ${ibmPlex.variable} antialiased`}
+        style={{ fontFamily: 'var(--font-body, sans-serif)' }}
       >
         {children}
       </body>

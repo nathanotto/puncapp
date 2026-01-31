@@ -27,8 +27,11 @@ export async function getCurrentUserProfile(): Promise<User | null> {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
+    console.error('[Auth] No user or auth error:', authError?.message)
     return null
   }
+
+  console.log('[Auth] Looking for profile for user:', user.id)
 
   const { data: profile, error: profileError } = await supabase
     .from('users')
@@ -37,9 +40,11 @@ export async function getCurrentUserProfile(): Promise<User | null> {
     .single()
 
   if (profileError) {
+    console.error('[Auth] Profile query error:', profileError.message, profileError.code, profileError.details)
     return null
   }
 
+  console.log('[Auth] Profile found:', profile ? 'YES' : 'NO')
   return profile as User
 }
 
@@ -70,8 +75,10 @@ export async function requireAuthWithProfile() {
 
   if (!profile) {
     // User is authenticated but no profile exists
-    // This shouldn't happen, but handle gracefully
-    redirect('/auth/setup-profile')
+    // This shouldn't happen - sign them out and redirect to signup
+    const supabase = await createClient()
+    await supabase.auth.signOut()
+    redirect('/auth/signup?error=profile_missing')
   }
 
   return profile

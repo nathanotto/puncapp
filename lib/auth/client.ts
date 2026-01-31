@@ -36,20 +36,16 @@ export async function signUp(data: SignUpData) {
     return { user: null, error: 'Failed to create user' }
   }
 
-  // 2. Create user profile
-  const { error: profileError } = await supabase
-    .from('users')
-    .insert({
-      id: authData.user.id,
-      name: data.name,
-      phone: data.phone,
-      email: data.email,
-      address: data.address,
-      username: data.username,
-      display_preference: data.displayPreference || 'real_name',
-      status: 'unassigned',
-      leader_certified: false,
-    })
+  // 2. Create user profile using RPC function (bypasses RLS)
+  const { error: profileError } = await supabase.rpc('create_user_profile', {
+    user_id: authData.user.id,
+    user_name: data.name,
+    user_phone: data.phone,
+    user_email: data.email,
+    user_address: data.address,
+    user_username: data.username,
+    user_display_preference: data.displayPreference || 'real_name',
+  })
 
   if (profileError) {
     // If profile creation fails, we should ideally clean up the auth user
