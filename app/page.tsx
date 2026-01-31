@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -15,12 +16,16 @@ export default function Home() {
             We are dedicated to ending the unnecessary suffering in men to end the suffering caused by men.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="primary" size="large">
-              Join a Chapter
-            </Button>
-            <Button variant="secondary" size="large">
-              Learn More
-            </Button>
+            <Link href="/auth/signup">
+              <Button variant="primary" size="large">
+                Join a Chapter
+              </Button>
+            </Link>
+            <Link href="/auth/signin">
+              <Button variant="secondary" size="large">
+                Sign In
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
