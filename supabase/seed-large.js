@@ -139,13 +139,32 @@ async function createChapters(users) {
 
   for (let i = 0; i < 20; i++) {
     const city = cities[i % cities.length]
+
+    // Spread creation dates over the past 12 months
+    // Earlier chapters created longer ago
+    const monthsAgo = Math.floor((19 - i) / 2) // Spread from 0-9 months ago
+    const createdDate = new Date()
+    createdDate.setMonth(createdDate.getMonth() - monthsAgo)
+    createdDate.setDate(Math.floor(Math.random() * 28) + 1) // Random day of month
+
+    // Decide if chapter should be closed (but not The Oak or The Six)
+    const shouldClose = i > 1 && i < 20 && Math.random() < 0.15 // ~15% closed rate, skip first 2
+    const status = shouldClose ? 'closed' : (i < 18 ? 'open' : 'forming')
+
+    // If closed, set a closed date (updated_at) sometime after creation
+    const updatedDate = shouldClose
+      ? new Date(createdDate.getTime() + Math.random() * (Date.now() - createdDate.getTime()))
+      : new Date()
+
     const { data: chapterData, error: chapterError } = await supabase
       .from('chapters')
       .insert({
         name: chapterNames[i],
-        status: i < 17 ? 'open' : (i < 19 ? 'forming' : 'closed'),
+        status: status,
         max_members: 12,
         monthly_support: 55.00,
+        created_at: createdDate.toISOString(),
+        updated_at: updatedDate.toISOString(),
         meeting_schedule: {
           frequency: 'biweekly',
           day_of_week: i % 7,
@@ -204,7 +223,8 @@ async function createChapters(users) {
     }
 
     chapters.push({ ...chapterData, members: chapterUsers })
-    console.log(`  ✅ ${chapterNames[i]} (${chapterUsers.length} members)`)
+    const statusLabel = chapterData.status === 'closed' ? '❌ closed' : chapterData.status === 'forming' ? '🔄 forming' : '✅ open'
+    console.log(`  ${statusLabel} ${chapterNames[i]} (${chapterUsers.length} members, created ${Math.floor((Date.now() - new Date(chapterData.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30))} months ago)`)
   }
 
   console.log(`\n✅ Created ${chapters.length} chapters\n`)

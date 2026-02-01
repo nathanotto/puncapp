@@ -140,38 +140,53 @@ export default async function AdminDashboard() {
 }
 
 async function ChapterGrowthGraph({ supabase }: { supabase: any }) {
-  // Count meetings held each month for the past 6 months (shows actual activity)
+  // Count active chapters each month for the past 12 months
   const months = []
   const data = []
 
-  for (let i = 5; i >= 0; i--) {
+  for (let i = 11; i >= 0; i--) {
     const date = new Date()
     date.setMonth(date.getMonth() - i)
-    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
     const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
 
-    const { count } = await supabase
-      .from('meetings')
-      .select('*', { count: 'exact', head: true })
-      .gte('scheduled_datetime', monthStart.toISOString())
-      .lte('scheduled_datetime', monthEnd.toISOString())
-      .eq('status', 'completed')
+    // Count chapters that were:
+    // - Created before or during this month
+    // - AND either still open OR closed after this month
+    const { data: chapters } = await supabase
+      .from('chapters')
+      .select('id, created_at, updated_at, status')
+      .lte('created_at', monthEnd.toISOString())
 
-    months.push(monthStart.toLocaleDateString('en-US', { month: 'short' }))
-    data.push(count || 0)
+    // Filter to only count chapters that were active during this month
+    const activeCount = chapters?.filter((c: any) => {
+      const createdDate = new Date(c.created_at)
+      const wasCreated = createdDate <= monthEnd
+
+      // If status is closed, check if it was closed after this month
+      if (c.status === 'closed') {
+        const closedDate = new Date(c.updated_at) // Assuming updated_at is when it was closed
+        return wasCreated && closedDate > monthEnd
+      }
+
+      // If open or forming, just check if it was created
+      return wasCreated
+    }).length || 0
+
+    months.push(date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }))
+    data.push(activeCount)
   }
 
   const maxValue = Math.max(...data, 1)
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">Meetings Held (Last 6 Months)</h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Active Chapters (Last 12 Months)</h3>
       <div className="flex items-end justify-between h-48 gap-2">
         {data.map((value, i) => (
           <div key={i} className="flex-1 flex flex-col items-center">
             <div className="text-xs font-semibold text-gray-700 mb-1">{value}</div>
             <div className="w-full bg-blue-500 rounded-t" style={{ height: `${(value / maxValue) * 100}%`, minHeight: value > 0 ? '4px' : '0' }} />
-            <div className="text-xs text-gray-600 mt-2">{months[i]}</div>
+            <div className="text-xs text-gray-600 mt-2 transform -rotate-45 origin-top-left">{months[i]}</div>
           </div>
         ))}
       </div>
