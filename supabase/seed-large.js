@@ -333,6 +333,96 @@ async function createFunding(chapters) {
   console.log(`✅ Created funding records (total: $${Math.round(totalFunding)})\n`)
 }
 
+async function createMeetings(chapters) {
+  console.log('Creating meetings...')
+  let totalMeetings = 0
+
+  const curriculumModules = [
+    'a1111111-1111-1111-1111-111111111111', // Fear of Men
+    'a2222222-2222-2222-2222-222222222222', // Addiction
+    'a3333333-3333-3333-3333-333333333333', // Relationships
+    'a4444444-4444-4444-4444-444444444444', // Anger
+    'a5555555-5555-5555-5555-555555555555', // Purpose
+    'a6666666-6666-6666-6666-666666666666', // Grief
+    'a7777777-7777-7777-7777-777777777777', // Shame
+    'a8888888-8888-8888-8888-888888888888', // Leadership
+  ]
+
+  const topics = [
+    'Fear of Men', 'Addiction and Compulsive Behavior', 'Relationships and Intimacy',
+    'Anger and Rage', 'Purpose and Calling', 'Grief and Loss',
+    'Shame and Vulnerability', 'Leadership and Responsibility'
+  ]
+
+  for (const chapter of chapters) {
+    if (!chapter.members || chapter.members.length === 0) continue
+
+    const createdDate = new Date(chapter.created_at)
+    const endDate = chapter.status === 'closed'
+      ? new Date(chapter.updated_at)
+      : new Date() // For open chapters, go up to now
+
+    // Add 4 weeks of future meetings for open chapters
+    const finalDate = chapter.status === 'closed' ? endDate : new Date(Date.now() + (4 * 7 * 24 * 60 * 60 * 1000))
+
+    let meetingDate = new Date(createdDate)
+    let meetingCount = 0
+
+    while (meetingDate <= finalDate) {
+      const isPast = meetingDate < new Date()
+      const moduleIdx = meetingCount % 8
+
+      const { data: meeting, error } = await supabase
+        .from('meetings')
+        .insert({
+          chapter_id: chapter.id,
+          scheduled_datetime: meetingDate.toISOString(),
+          location: chapter.next_meeting_location,
+          topic: topics[moduleIdx],
+          curriculum_module_id: curriculumModules[moduleIdx],
+          status: isPast ? 'completed' : 'scheduled'
+        })
+        .select()
+        .single()
+
+      if (!error && isPast && meeting) {
+        // Add attendance for completed meetings
+        for (const member of chapter.members) {
+          const attended = Math.random() > 0.2 // 80% attendance rate
+          await supabase
+            .from('attendance')
+            .insert({
+              meeting_id: meeting.id,
+              user_id: member.id,
+              rsvp_status: attended ? 'yes' : 'no',
+              attendance_type: attended ? (Math.random() > 0.1 ? 'in_person' : 'video') : 'absent',
+              checked_in_at: attended ? meetingDate.toISOString() : null
+            })
+
+          // Add feedback
+          if (attended) {
+            await supabase
+              .from('meeting_feedback')
+              .insert({
+                meeting_id: meeting.id,
+                user_id: member.id,
+                value_rating: Math.floor(7 + Math.random() * 4) // 7-10
+              })
+          }
+        }
+      }
+
+      totalMeetings++
+      meetingCount++
+
+      // Add 3 weeks
+      meetingDate = new Date(meetingDate.getTime() + (21 * 24 * 60 * 60 * 1000))
+    }
+  }
+
+  console.log(`✅ Created ${totalMeetings} meetings\n`)
+}
+
 async function main() {
   console.log('🌱 Starting large seed...\n')
 
@@ -340,6 +430,7 @@ async function main() {
     await clearExistingData()
     const users = await createUsers(200)
     const chapters = await createChapters(users)
+    await createMeetings(chapters)
     await createCommitments(chapters)
     await createFunding(chapters)
 
@@ -347,6 +438,7 @@ async function main() {
     console.log('Summary:')
     console.log(`  - ${users.length} users`)
     console.log(`  - ${chapters.length} chapters`)
+    console.log(`  - Meetings with attendance & feedback`)
     console.log(`  - 100 commitments`)
     console.log(`  - Chapter funding (~50% funded)`)
   } catch (err) {
