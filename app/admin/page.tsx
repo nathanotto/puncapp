@@ -140,7 +140,7 @@ export default async function AdminDashboard() {
 }
 
 async function ChapterGrowthGraph({ supabase }: { supabase: any }) {
-  // Get chapters created each month for the past 6 months
+  // Count meetings held each month for the past 6 months (shows actual activity)
   const months = []
   const data = []
 
@@ -151,10 +151,11 @@ async function ChapterGrowthGraph({ supabase }: { supabase: any }) {
     const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
 
     const { count } = await supabase
-      .from('chapters')
+      .from('meetings')
       .select('*', { count: 'exact', head: true })
-      .lte('created_at', monthEnd.toISOString())
-      .eq('status', 'open')
+      .gte('scheduled_datetime', monthStart.toISOString())
+      .lte('scheduled_datetime', monthEnd.toISOString())
+      .eq('status', 'completed')
 
     months.push(monthStart.toLocaleDateString('en-US', { month: 'short' }))
     data.push(count || 0)
@@ -164,7 +165,7 @@ async function ChapterGrowthGraph({ supabase }: { supabase: any }) {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">Active Chapters (Last 6 Months)</h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Meetings Held (Last 6 Months)</h3>
       <div className="flex items-end justify-between h-48 gap-2">
         {data.map((value, i) => (
           <div key={i} className="flex-1 flex flex-col items-center">
