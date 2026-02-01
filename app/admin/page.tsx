@@ -127,16 +127,94 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* Recent Activity Section (Placeholder) */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
-        </div>
-        <div className="px-6 py-8 text-center text-gray-500">
-          <p>Recent chapters, meetings, and member activity will appear here.</p>
-          <p className="text-sm mt-2">Navigate to specific sections using the tabs above.</p>
-        </div>
+      {/* Graphs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Active Chapters Over Time */}
+        <ChapterGrowthGraph supabase={supabase} />
+
+        {/* Revenue Over Time */}
+        <RevenueGraph supabase={supabase} />
       </div>
     </AdminLayout>
+  )
+}
+
+async function ChapterGrowthGraph({ supabase }: { supabase: any }) {
+  // Get chapters created each month for the past 6 months
+  const months = []
+  const data = []
+
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date()
+    date.setMonth(date.getMonth() - i)
+    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
+    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+
+    const { count } = await supabase
+      .from('chapters')
+      .select('*', { count: 'exact', head: true })
+      .lte('created_at', monthEnd.toISOString())
+      .eq('status', 'open')
+
+    months.push(monthStart.toLocaleDateString('en-US', { month: 'short' }))
+    data.push(count || 0)
+  }
+
+  const maxValue = Math.max(...data, 1)
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Active Chapters (Last 6 Months)</h3>
+      <div className="flex items-end justify-between h-48 gap-2">
+        {data.map((value, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center">
+            <div className="text-xs font-semibold text-gray-700 mb-1">{value}</div>
+            <div className="w-full bg-blue-500 rounded-t" style={{ height: `${(value / maxValue) * 100}%`, minHeight: value > 0 ? '4px' : '0' }} />
+            <div className="text-xs text-gray-600 mt-2">{months[i]}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+async function RevenueGraph({ supabase }: { supabase: any }) {
+  // Get revenue each month for the past 6 months
+  const months = []
+  const data = []
+
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date()
+    date.setMonth(date.getMonth() - i)
+    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
+    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+
+    const { data: funding } = await supabase
+      .from('chapter_funding')
+      .select('amount')
+      .gte('funding_date', monthStart.toISOString().split('T')[0])
+      .lte('funding_date', monthEnd.toISOString().split('T')[0])
+
+    const total = funding?.reduce((sum: number, f: any) => sum + parseFloat(f.amount), 0) || 0
+
+    months.push(monthStart.toLocaleDateString('en-US', { month: 'short' }))
+    data.push(total)
+  }
+
+  const maxValue = Math.max(...data, 1)
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Revenue from Funding (Last 6 Months)</h3>
+      <div className="flex items-end justify-between h-48 gap-2">
+        {data.map((value, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center">
+            <div className="text-xs font-semibold text-gray-700 mb-1">${Math.round(value)}</div>
+            <div className="w-full bg-green-500 rounded-t" style={{ height: `${(value / maxValue) * 100}%`, minHeight: value > 0 ? '4px' : '0' }} />
+            <div className="text-xs text-gray-600 mt-2">{months[i]}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
