@@ -129,9 +129,9 @@ export default async function DashboardPage() {
                     ) : (
                       <p className="text-sm text-stone-gray mb-3">No meeting scheduled</p>
                     )}
-                    <Link href={`/chapters/${chapter.id}/meetings`}>
-                      <Button variant="secondary" size="small" fullWidth>
-                        View Meetings
+                    <Link href={`/chapters/${chapter.id}`}>
+                      <Button variant="primary" size="small" fullWidth>
+                        Chapter Dashboard
                       </Button>
                     </Link>
                   </Card>
