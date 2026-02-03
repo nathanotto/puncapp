@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import PendingTasksList from '@/components/task/PendingTasksList';
 
-export default async function HomePage() {
+export default async function DashboardPage() {
   const supabase = await createClient();
 
   // Get current user
@@ -12,10 +12,10 @@ export default async function HomePage() {
     redirect('/auth/login');
   }
 
-  // Get user's name
-  const { data: userData } = await supabase
+  // Get user's profile from public.users
+  const { data: profile } = await supabase
     .from('users')
-    .select('name, username')
+    .select('*')
     .eq('id', user.id)
     .single();
 
@@ -75,20 +75,18 @@ export default async function HomePage() {
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-end mb-4">
             <div className="text-right text-sm">
-              <p className="text-warm-cream/80">{userData?.username || userData?.name || 'Member'}</p>
+              <p className="text-warm-cream/80">{profile?.username || profile?.name || 'Member'}</p>
               <a href="/auth/logout" className="text-warm-cream/60 hover:text-warm-cream">
                 Sign Out
               </a>
             </div>
           </div>
-          <h1 className="text-3xl font-bold mb-2">
-            Welcome back, {userData?.name || 'Member'}
-          </h1>
-          <p className="text-warm-cream/80">Here's what needs your attention</p>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-warm-cream/80">Welcome back, {profile?.name || 'Member'}</p>
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Main Content */}
       <main className="max-w-4xl mx-auto py-8 px-6">
         {/* In-Progress Meetings Banner */}
         {inProgressMeetings && inProgressMeetings.length > 0 && (
@@ -188,9 +186,7 @@ export default async function HomePage() {
 
         {/* Pending Tasks */}
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-earth-brown mb-4">
-            Your Tasks
-          </h2>
+          <h2 className="text-2xl font-bold text-earth-brown mb-4">Pending Tasks</h2>
           <PendingTasksList userId={user.id} />
         </div>
       </main>
