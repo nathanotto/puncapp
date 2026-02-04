@@ -251,18 +251,31 @@ export default function MeetingView({
           </div>
         )}
 
-        {/* Start Meeting (Scribe only, during meeting) */}
-        {isScribe && meeting.status === 'in_progress' && (
-          <div className="bg-sage-green/10 border-2 border-sage-green rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-earth-brown mb-3">Scribe Controls</h3>
+        {/* Run Meeting (All members during meeting) */}
+        {meeting.status === 'in_progress' && (
+          <div className={`border-2 rounded-lg p-6 ${
+            isScribe
+              ? 'bg-sage-green/10 border-sage-green'
+              : 'bg-blue-50 border-blue-300'
+          }`}>
+            <h3 className="text-lg font-semibold text-earth-brown mb-3">
+              {isScribe ? '🎯 Scribe Controls' : '👀 Follow Meeting'}
+            </h3>
             <p className="text-stone-gray mb-4">
-              Control the meeting flow through Opening, Lightning Round, and Full Check-ins.
+              {isScribe
+                ? 'You are the Scribe for this meeting. Control the meeting flow through Opening, Lightning Round, and Full Check-ins.'
+                : 'Follow along with the meeting progress in real-time.'
+              }
             </p>
             <Link
               href={`/meetings/${meeting.id}/run`}
-              className="inline-block bg-sage-green text-deep-charcoal py-3 px-6 rounded-lg font-semibold hover:bg-sage-green/90 transition-colors"
+              className={`inline-block py-3 px-6 rounded-lg font-semibold transition-colors ${
+                isScribe
+                  ? 'bg-sage-green text-deep-charcoal hover:bg-sage-green/90'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
-              Start Meeting
+              {isScribe ? '→ Run Meeting' : '→ View Meeting'}
             </Link>
           </div>
         )}

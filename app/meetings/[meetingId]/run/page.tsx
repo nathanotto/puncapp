@@ -1,10 +1,24 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { loadMeetingRunnerContext } from '@/lib/meeting-runner-context'
-import { OpeningSection } from '@/components/meeting/OpeningSection'
-import { LightningRound } from '@/components/meeting/LightningRound'
-import { advanceSection, logLightningRound, skipLightningRound } from './actions'
-import { TimeLeft } from './TimeLeft'
+import {
+  startTimer,
+  stopTimer,
+  changeScribe,
+  advanceSection,
+  logLightningRound,
+  skipLightningRound,
+  logFullCheckin,
+  skipFullCheckin,
+  addMeetingTime,
+  ditchCurriculum,
+  submitCurriculumResponse,
+  completeCurriculum,
+  submitMeetingFeedback,
+  saveAudioMetadata,
+  completeMeeting
+} from './actions'
+import { MeetingRunnerClient } from './MeetingRunnerClient'
 
 export default async function MeetingRunnerPage({
   params,
@@ -24,35 +38,82 @@ export default async function MeetingRunnerPage({
     return <div className="p-8 text-center text-red-600">{context.reason}</div>
   }
 
-  const { meeting, attendees, timeLogs, isScribe, meetingEndTime } = context
+  const { meeting, attendees, timeLogs, isScribe, meetingEndTime, curriculumModule, curriculumResponses, meetingFeedback, audioRecording } = context
 
-  // Get lightning round logs
-  const lightningLogs = timeLogs
-    ?.filter(l => l.section === 'lightning_round' && l.user_id)
-    .map(l => ({
-      user_id: l.user_id!,
-      duration_seconds: l.duration_seconds || 0,
-      overtime_seconds: l.overtime_seconds || 0,
-      priority: l.priority,
-      skipped: l.skipped || false,
-    })) || []
+  // Get user data for header
+  const { data: userData } = await supabase
+    .from('users')
+    .select('name, username')
+    .eq('id', user.id)
+    .single()
+
+  // Format meeting date for header
+  const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`)
+  const meetingDate = meetingDateTime.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  })
+
+  // Get all chapter members
+  const { data: allMembers } = await supabase
+    .from('chapter_memberships')
+    .select(`
+      user_id,
+      users!chapter_memberships_user_id_fkey(id, name, username)
+    `)
+    .eq('chapter_id', meeting.chapter_id)
+    .eq('is_active', true)
+
+  // Calculate not-checked-in members
+  const checkedInUserIds = new Set(attendees.map(a => a.user_id))
+  const notCheckedInMembers = allMembers?.filter(m => !checkedInUserIds.has(m.user_id)) || []
+
+  // Fetch stretch goals for all attendees
+  const attendeeUserIds = attendees.map(a => a.user_id)
+  const { data: stretchGoals } = await supabase
+    .from('commitments')
+    .select('id, committer_id, description')
+    .eq('commitment_type', 'stretch_goal')
+    .eq('status', 'active')
+    .in('committer_id', attendeeUserIds)
+
+  // Transform to lookup object
+  const stretchGoalsByUser: Record<string, { id: string; description: string } | null> = {}
+  attendeeUserIds.forEach(userId => {
+    const goal = stretchGoals?.find(g => g.committer_id === userId)
+    stretchGoalsByUser[userId] = goal ? { id: goal.id, description: goal.description } : null
+  })
 
   // Create async wrapper functions for server actions
+  const handleStartTimer = async (userId: string) => {
+    'use server'
+    await startTimer(meetingId, userId)
+  }
+
+  const handleStopTimer = async () => {
+    'use server'
+    await stopTimer(meetingId)
+  }
+
+  const handleChangeScribe = async (newScribeId: string) => {
+    'use server'
+    await changeScribe(meetingId, newScribeId)
+  }
+
   const handleMeditationComplete = async () => {
     'use server'
-    console.log('handleMeditationComplete called')
     await advanceSection(meetingId, 'opening_ethos')
   }
 
   const handleEthosComplete = async () => {
     'use server'
-    console.log('handleEthosComplete called')
     await advanceSection(meetingId, 'lightning_round')
   }
 
   const handleLightningComplete = async () => {
     'use server'
-    console.log('handleLightningComplete called')
     await advanceSection(meetingId, 'full_checkins')
   }
 
@@ -71,155 +132,115 @@ export default async function MeetingRunnerPage({
     await skipLightningRound(meetingId, userId)
   }
 
-  return (
-    <div className="max-w-2xl mx-auto p-4">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <h1 className="text-2xl font-bold">Meeting in Progress</h1>
-          <p className="text-lg font-semibold">Current Phase: {formatPhase(meeting.current_section)}</p>
-        </div>
-        <div className="flex gap-6">
-          <div>
-            <p className="text-sm text-gray-500">Time Left</p>
-            <p className="text-xl font-mono font-bold text-orange-600">
-              <TimeLeft endTime={meetingEndTime} />
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">End Time</p>
-            <p className="text-xl font-mono font-bold">{formatTime(meetingEndTime)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Meeting Phase Progress */}
-      <div className="mb-8 bg-gray-50 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Phases</h3>
-        <div className="space-y-2">
-          {[
-            { key: 'opening_meditation', label: 'Opening' },
-            { key: 'opening_ethos', label: 'Ethos' },
-            { key: 'lightning_round', label: 'Lightning Round' },
-            { key: 'full_checkins', label: 'Check-ins' },
-            { key: 'curriculum', label: 'Curriculum' },
-            { key: 'closing', label: 'Close' },
-          ].map((section) => {
-            const sectionIndex = ['not_started', 'opening_meditation', 'opening_ethos', 'lightning_round', 'full_checkins', 'curriculum', 'closing', 'ended'].indexOf(section.key)
-            const currentIndex = ['not_started', 'opening_meditation', 'opening_ethos', 'lightning_round', 'full_checkins', 'curriculum', 'closing', 'ended'].indexOf(meeting.current_section)
-
-            const isComplete = currentIndex > sectionIndex
-            const isCurrent = meeting.current_section === section.key ||
-              (section.key === 'opening_meditation' && ['not_started', 'opening_meditation'].includes(meeting.current_section))
-            const isPending = currentIndex < sectionIndex
-
-            return (
-              <div
-                key={section.key}
-                className={`flex items-center gap-3 p-3 rounded ${
-                  isCurrent ? 'bg-blue-100 border-2 border-blue-400' :
-                  isComplete ? 'bg-green-50' :
-                  'bg-white'
-                }`}
-              >
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                  isComplete ? 'border-green-500 bg-green-500' :
-                  isCurrent ? 'border-blue-500 bg-blue-500' :
-                  'border-gray-300'
-                }`}>
-                  {isComplete ? (
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : isCurrent ? (
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
-                  ) : null}
-                </div>
-                <span className={`font-medium ${
-                  isCurrent ? 'text-blue-900' :
-                  isComplete ? 'text-green-700' :
-                  'text-gray-500'
-                }`}>
-                  {section.label}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Section content */}
-      {(meeting.current_section === 'opening_meditation' ||
-        meeting.current_section === 'opening_ethos' ||
-        meeting.current_section === 'not_started') && (
-        <OpeningSection
-          isScribe={isScribe}
-          currentSection={meeting.current_section}
-          onMeditationComplete={handleMeditationComplete}
-          onEthosComplete={handleEthosComplete}
-        />
-      )}
-
-      {meeting.current_section === 'lightning_round' && (
-        <LightningRound
-          attendees={attendees}
-          isScribe={isScribe}
-          completedLogs={lightningLogs}
-          onPersonComplete={handlePersonComplete}
-          onPersonSkip={handlePersonSkip}
-          onRoundComplete={handleLightningComplete}
-        />
-      )}
-
-      {meeting.current_section === 'full_checkins' && (
-        <div className="text-center py-8 text-gray-500">
-          Full Check-ins coming in Session 6...
-        </div>
-      )}
-
-      {meeting.current_section === 'curriculum' && (
-        <div className="text-center py-8 text-gray-500">
-          Curriculum coming in Session 7...
-        </div>
-      )}
-
-      {meeting.current_section === 'closing' && (
-        <div className="text-center py-8 text-gray-500">
-          Closing coming in Session 7...
-        </div>
-      )}
-    </div>
-  )
-}
-
-function formatPhase(section: string): string {
-  if (section === 'not_started' || section === 'opening_meditation') return 'Opening'
-  if (section === 'opening_ethos') return 'Ethos'
-  if (section === 'lightning_round') return 'Lightning Round'
-  if (section === 'full_checkins') return 'Check-ins'
-  if (section === 'curriculum') return 'Curriculum'
-  if (section === 'closing') return 'Close'
-  if (section === 'ended') return 'Ended'
-  return section
-}
-
-function formatSection(section: string): string {
-  const names: Record<string, string> = {
-    'not_started': 'Not Started',
-    'opening_meditation': 'Opening – Meditation',
-    'opening_ethos': 'Opening – Ethos',
-    'lightning_round': 'Lightning Round',
-    'full_checkins': 'Full Check-ins',
-    'closing': 'Closing',
-    'ended': 'Ended',
+  const handleFullCheckinComplete = async (
+    userId: string,
+    durationSeconds: number,
+    overtimeSeconds: number,
+    stretchGoalAction: 'kept' | 'completed' | 'new' | 'none',
+    requestedSupport: boolean,
+    newStretchGoalText?: string
+  ) => {
+    'use server'
+    await logFullCheckin(
+      meetingId,
+      userId,
+      durationSeconds,
+      overtimeSeconds,
+      stretchGoalAction,
+      requestedSupport,
+      newStretchGoalText
+    )
   }
-  return names[section] || section
-}
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  })
+  const handleFullCheckinSkip = async (userId: string) => {
+    'use server'
+    await skipFullCheckin(meetingId, userId)
+  }
+
+  const handleAddMeetingTime = async (minutes: number) => {
+    'use server'
+    await addMeetingTime(meetingId, minutes)
+  }
+
+  const handleDitchCurriculum = async () => {
+    'use server'
+    await ditchCurriculum(meetingId)
+  }
+
+  const handleFullCheckinsComplete = async () => {
+    'use server'
+    const nextSection = meeting.curriculum_ditched ? 'closing' : 'curriculum'
+    await advanceSection(meetingId, nextSection)
+  }
+
+  const handleSubmitCurriculumResponse = async (response: string) => {
+    'use server'
+    if (!meeting.selected_curriculum_id) {
+      throw new Error('No curriculum module selected')
+    }
+    await submitCurriculumResponse(meetingId, meeting.selected_curriculum_id, response)
+  }
+
+  const handleCurriculumComplete = async () => {
+    'use server'
+    await completeCurriculum(meetingId)
+  }
+
+  const handleSubmitFeedback = async (
+    rating: number | null,
+    mostValueUserId: string | null,
+    skipRating: boolean,
+    skipMostValue: boolean
+  ) => {
+    'use server'
+    await submitMeetingFeedback(meetingId, rating, mostValueUserId, skipRating, skipMostValue)
+  }
+
+  const handleSaveAudioMetadata = async (storagePath: string) => {
+    'use server'
+    // File size is not available here, but we can set it to 0 or fetch from storage if needed
+    await saveAudioMetadata(meetingId, storagePath, 0)
+  }
+
+  const handleCompleteMeeting = async () => {
+    'use server'
+    await completeMeeting(meetingId)
+  }
+
+  return (
+    <MeetingRunnerClient
+      initialMeeting={meeting}
+      initialAttendees={attendees}
+      initialNotCheckedIn={notCheckedInMembers}
+      initialTimeLogs={timeLogs}
+      initialCurriculumModule={curriculumModule}
+      initialCurriculumResponses={curriculumResponses}
+      initialMeetingFeedback={meetingFeedback}
+      initialAudioRecording={audioRecording}
+      isScribe={isScribe}
+      currentUserId={user.id}
+      currentUserName={userData?.username || userData?.name || 'Member'}
+      meetingEndTime={meetingEndTime}
+      meetingDate={meetingDate}
+      stretchGoalsByUser={stretchGoalsByUser}
+      onStartTimer={handleStartTimer}
+      onStopTimer={handleStopTimer}
+      onChangeScribe={handleChangeScribe}
+      onMeditationComplete={handleMeditationComplete}
+      onEthosComplete={handleEthosComplete}
+      onLightningComplete={handleLightningComplete}
+      onPersonComplete={handlePersonComplete}
+      onPersonSkip={handlePersonSkip}
+      onFullCheckinComplete={handleFullCheckinComplete}
+      onFullCheckinSkip={handleFullCheckinSkip}
+      onAddMeetingTime={handleAddMeetingTime}
+      onDitchCurriculum={handleDitchCurriculum}
+      onFullCheckinsComplete={handleFullCheckinsComplete}
+      onSubmitCurriculumResponse={handleSubmitCurriculumResponse}
+      onCurriculumComplete={handleCurriculumComplete}
+      onSubmitFeedback={handleSubmitFeedback}
+      onSaveAudioMetadata={handleSaveAudioMetadata}
+      onCompleteMeeting={handleCompleteMeeting}
+    />
+  )
 }

@@ -25,6 +25,10 @@ interface LightningRoundProps {
   attendees: Attendee[]
   isScribe: boolean
   completedLogs: LightningLog[]
+  currentTimerUserId: string | null
+  currentTimerStart: string | null
+  onStartTimer: (userId: string) => Promise<void>
+  onStopTimer: () => Promise<void>
   onPersonComplete: (userId: string, durationSeconds: number, overtimeSeconds: number, priority: number) => Promise<void>
   onPersonSkip: (userId: string) => Promise<void>
   onRoundComplete: () => Promise<void>
@@ -34,14 +38,20 @@ export function LightningRound({
   attendees,
   isScribe,
   completedLogs,
+  currentTimerUserId,
+  currentTimerStart,
+  onStartTimer,
+  onStopTimer,
   onPersonComplete,
   onPersonSkip,
   onRoundComplete,
 }: LightningRoundProps) {
   const [queue, setQueue] = useState<Attendee[]>([])
-  const [startTime, setStartTime] = useState<Date | null>(null)
   const [isCompleting, setIsCompleting] = useState(false)
   const hasInitialized = useRef(false)
+
+  // Convert shared timer to Date object
+  const startTime = currentTimerStart ? new Date(currentTimerStart) : null
 
   // Initialize queue with random order (only once)
   useEffect(() => {
@@ -63,8 +73,9 @@ export function LightningRound({
   const currentPerson = currentIndex >= 0 ? queue[currentIndex] : null
   const isComplete = currentIndex === -1 || currentIndex >= queue.length
 
-  function handleStart() {
-    setStartTime(new Date())
+  async function handleStart() {
+    if (!currentPerson) return
+    await onStartTimer(currentPerson.user_id)
   }
 
   async function handleNext(overtimeSeconds: number, priority?: number) {
@@ -96,7 +107,8 @@ export function LightningRound({
       )
 
       console.log('[CLIENT] Person complete logged successfully')
-      setStartTime(null)
+      // Stop the timer
+      await onStopTimer()
     } catch (error) {
       console.error('[CLIENT] Error completing person:', error)
       alert('Failed to log completion. Check console.')
@@ -111,7 +123,10 @@ export function LightningRound({
     try {
       await onPersonSkip(currentPerson.user_id)
       console.log('Person skip logged successfully')
-      setStartTime(null)
+      // Stop the timer if it was running
+      if (currentTimerUserId) {
+        await onStopTimer()
+      }
     } catch (error) {
       console.error('Error skipping person:', error)
       alert('Failed to log skip. Check console.')

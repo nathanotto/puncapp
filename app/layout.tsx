@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Merriweather, Source_Sans_3, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
+import { createClient } from '@/lib/supabase/server';
+import { TesterPanel } from '@/components/tester/TesterPanel';
 
 const merriweather = Merriweather({
   variable: "--font-heading",
@@ -28,11 +30,27 @@ export const metadata: Metadata = {
   description: "Find your brotherhood. Project UNcivilized chapter management.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+
+  // Get current user and check if they're a tester
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+
+  let testerUser = null;
+  if (authUser) {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id, is_tester, is_punc_admin')
+      .eq('id', authUser.id)
+      .single();
+
+    testerUser = userData;
+  }
+
   return (
     <html lang="en">
       <body
@@ -40,6 +58,14 @@ export default function RootLayout({
         style={{ fontFamily: 'var(--font-body, sans-serif)' }}
       >
         {children}
+        {testerUser?.is_tester && (
+          <TesterPanel
+            user={testerUser}
+            currentChapter={undefined}
+            currentMeeting={undefined}
+            userRole={undefined}
+          />
+        )}
       </body>
     </html>
   );

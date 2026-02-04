@@ -14,6 +14,7 @@ function getTaskUrl(taskType: string, relatedEntityId: string, taskId?: string):
     'contact_unresponsive_member': (id, tid) => `/tasks/meeting-cycle/contact-unresponsive-member?attendance=${id}&task=${tid}`,
     'check_in_to_meeting': (id) => `/tasks/meeting-cycle/check-in?meeting=${id}`,
     'start_meeting': (id) => `/tasks/meeting-cycle/start-meeting?meeting=${id}`,
+    'select_curriculum': (id) => `/tasks/meeting-cycle/select-curriculum?meeting=${id}`,
     'confirm_commitment': (id) => `/tasks/confirm-commitment/${id}`,
     'review_application': (id) => `/tasks/review-application/${id}`,
   };

@@ -48,6 +48,36 @@ export async function loadMeetingRunnerContext(meetingId: string, userId: string
     .eq('meeting_id', meetingId)
     .order('start_time', { ascending: true })
 
+  // Get selected curriculum module if any
+  let curriculumModule = null
+  if (meeting.selected_curriculum_id) {
+    const { data: module } = await supabase
+      .from('curriculum_modules')
+      .select('*')
+      .eq('id', meeting.selected_curriculum_id)
+      .single()
+    curriculumModule = module
+  }
+
+  // Get curriculum responses for this meeting
+  const { data: curriculumResponses } = await supabase
+    .from('curriculum_responses')
+    .select('user_id, response')
+    .eq('meeting_id', meetingId)
+
+  // Get meeting feedback
+  const { data: meetingFeedback } = await supabase
+    .from('meeting_feedback')
+    .select('user_id, value_rating, most_value_user_id, skipped_rating, skipped_most_value')
+    .eq('meeting_id', meetingId)
+
+  // Get audio recording if any
+  const { data: audioRecording } = await supabase
+    .from('meeting_recordings')
+    .select('storage_path, recorded_by')
+    .eq('meeting_id', meetingId)
+    .maybeSingle()
+
   const isScribe = meeting.scribe_id === userId
   const isLeader = membership.role === 'leader' || membership.role === 'backup_leader'
 
@@ -60,6 +90,10 @@ export async function loadMeetingRunnerContext(meetingId: string, userId: string
     meeting,
     attendees: attendees || [],
     timeLogs: timeLogs || [],
+    curriculumModule,
+    curriculumResponses: curriculumResponses || [],
+    meetingFeedback: meetingFeedback || [],
+    audioRecording: audioRecording || null,
     isScribe,
     isLeader,
     canControl: isScribe || isLeader,

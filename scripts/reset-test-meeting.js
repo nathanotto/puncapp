@@ -155,6 +155,37 @@ async function resetTestMeeting() {
 
   console.log('✓ Set Nathan as Leader')
 
+  // Get chapter name for task metadata
+  const { data: chapter } = await supabase
+    .from('chapters')
+    .select('name')
+    .eq('id', CHAPTER_ID)
+    .single()
+
+  // Clean up any existing curriculum selection task for this meeting
+  await supabase
+    .from('pending_tasks')
+    .delete()
+    .eq('task_type', 'select_curriculum')
+    .eq('related_entity_id', meetingId)
+
+  // Create curriculum selection task for the Leader
+  await supabase
+    .from('pending_tasks')
+    .insert({
+      task_type: 'select_curriculum',
+      assigned_to: nathan.id,
+      related_entity_type: 'meeting',
+      related_entity_id: meetingId,
+      due_at: new Date(meetingDate).toISOString(),
+      metadata: {
+        chapter_id: CHAPTER_ID,
+        chapter_name: chapter?.name || 'Oak Chapter',
+      }
+    })
+
+  console.log('✓ Created curriculum selection task for Leader')
+
   // Clean up stale pending tasks for old meetings
   await supabase
     .from('pending_tasks')
