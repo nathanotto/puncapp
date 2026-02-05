@@ -11,7 +11,7 @@ function getTaskUrl(taskType: string, relatedEntityId: string, taskId?: string):
   // We'll expand this as we build more tasks
   const urlMap: Record<string, (id: string, taskId?: string) => string> = {
     'respond_to_rsvp': (id) => `/tasks/meeting-cycle/respond-to-rsvp?meeting=${id}`,
-    'contact_unresponsive_member': (id, tid) => `/tasks/meeting-cycle/contact-unresponsive-member?attendance=${id}&task=${tid}`,
+    'contact_unresponsive_member': () => `/tasks/meeting-cycle/contact-unresponsive-member`,
     'check_in_to_meeting': (id) => `/tasks/meeting-cycle/check-in?meeting=${id}`,
     'start_meeting': (id) => `/tasks/meeting-cycle/start-meeting?meeting=${id}`,
     'select_curriculum': (id) => `/tasks/meeting-cycle/select-curriculum?meeting=${id}`,
@@ -85,9 +85,47 @@ export default async function PendingTasksList({ userId }: PendingTasksListProps
     );
   }
 
+  // Group contact_unresponsive_member tasks together
+  const contactTasks = tasks.filter(t => t.task_type === 'contact_unresponsive_member');
+  const otherTasks = tasks.filter(t => t.task_type !== 'contact_unresponsive_member');
+
   return (
     <div className="space-y-3">
-      {tasks.map((task) => {
+      {/* Show grouped contact tasks first if any exist */}
+      {contactTasks.length > 0 && (
+        <Link
+          href={getTaskUrl(contactTasks[0].task_type, contactTasks[0].related_entity_id, contactTasks[0].id)}
+          className="block rounded-lg p-4 hover:shadow-md transition-shadow border bg-white border-gray-200"
+        >
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-semibold text-earth-brown">
+                  Contact RSVP Holdouts
+                </h3>
+              </div>
+              <p className="text-sm text-stone-gray">
+                {contactTasks.map(t => t.metadata?.member_name).filter(Boolean).join(', ')}
+              </p>
+            </div>
+
+            {contactTasks[0].due_at && (
+              <div
+                className={`text-sm font-medium px-3 py-1 rounded-full ${
+                  formatDueDate(contactTasks[0].due_at)?.startsWith('Overdue')
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-burnt-orange/10 text-burnt-orange'
+                }`}
+              >
+                {formatDueDate(contactTasks[0].due_at)}
+              </div>
+            )}
+          </div>
+        </Link>
+      )}
+
+      {/* Show other tasks normally */}
+      {otherTasks.map((task) => {
         const dueDate = formatDueDate(task.due_at);
         const isOverdue = dueDate?.startsWith('Overdue') || false;
         const urgency = task.urgency || 'normal';

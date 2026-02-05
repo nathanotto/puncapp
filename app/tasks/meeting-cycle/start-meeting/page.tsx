@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import StartMeetingForm from './StartMeetingForm';
+import StartMeetingSection from './StartMeetingSection';
 
 interface StartMeetingPageProps {
   searchParams: Promise<{ meeting: string }>;
@@ -168,11 +168,28 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
   const rsvpNoMembers = notCheckedInWithRsvp.filter(m => m.rsvp_status === 'no');
   const noResponseMembers = notCheckedInWithRsvp.filter(m => m.rsvp_status === 'no_response');
 
-  // Calculate if starting late
+  // Calculate timing
   const now = new Date();
   const scheduledDateTime = combineDateAndTime(meeting.scheduled_date, meeting.scheduled_time);
-  const minutesLate = Math.round((now.getTime() - scheduledDateTime.getTime()) / 60000);
-  const isLate = minutesLate > 10;
+  const minutesDiff = Math.round((now.getTime() - scheduledDateTime.getTime()) / 60000);
+  const isLate = minutesDiff > 10;
+  const minutesUntilMeeting = -minutesDiff; // Positive means in the future
+  const isTooEarly = minutesUntilMeeting > 15;
+
+  // Format how far in the future the meeting is
+  let timeUntilText = '';
+  if (isTooEarly) {
+    const daysUntil = Math.floor(minutesUntilMeeting / (24 * 60));
+    const hoursUntil = Math.floor(minutesUntilMeeting / 60);
+
+    if (daysUntil >= 1) {
+      timeUntilText = daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
+    } else if (hoursUntil >= 1) {
+      timeUntilText = `in ${hoursUntil} hour${hoursUntil > 1 ? 's' : ''}`;
+    } else {
+      timeUntilText = `in ${minutesUntilMeeting} minutes`;
+    }
+  }
 
   // Use the combined scheduledDateTime to avoid timezone issues
   const meetingDate = scheduledDateTime.toLocaleDateString('en-US', {
@@ -204,115 +221,53 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
       </header>
 
       <main className="max-w-4xl mx-auto py-8 px-6">
+        {/* Too early warning */}
+        {isTooEarly && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-bold text-red-900 mb-3">⏰ Too Early to Start</h2>
+            <p className="text-red-800 mb-2">
+              This meeting is scheduled for <strong>{timeUntilText}</strong>.
+            </p>
+            <p className="text-red-700">
+              Meetings can't start until <strong>15 minutes before</strong> the scheduled time.
+            </p>
+            <div className="mt-4 flex gap-3">
+              <Link
+                href={`/meetings/${meetingId}`}
+                className="inline-block bg-red-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+              >
+                View Meeting Details
+              </Link>
+              <Link
+                href="/"
+                className="inline-block bg-white text-red-600 border-2 border-red-600 py-2 px-4 rounded-lg font-semibold hover:bg-red-50 transition-colors"
+              >
+                Back to Dashboard
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Late warning */}
-        {isLate && (
+        {!isTooEarly && isLate && (
           <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4 mb-6">
             <p className="text-orange-900 font-medium">
-              ⚠️ Meeting is starting {minutesLate} minutes late. This will be noted.
+              ⚠️ Meeting is starting {minutesDiff} minutes late. This will be noted.
             </p>
           </div>
         )}
 
-        {/* Attendance Summary */}
-        <div className="bg-white rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-earth-brown mb-4">Attendance</h2>
-
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="text-3xl font-bold text-green-600">{checkedInMembers.length}</div>
-              <div className="text-sm text-green-800">Checked In</div>
-            </div>
-            <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <div className="text-3xl font-bold text-orange-600">{notCheckedInMembers.length}</div>
-              <div className="text-sm text-orange-800">Not Yet</div>
-            </div>
-          </div>
-
-          {/* Checked in members */}
-          {checkedInMembers.length > 0 && (
-            <div className="mb-4">
-              <h3 className="font-semibold text-earth-brown mb-2">Checked In:</h3>
-              <div className="space-y-1">
-                {checkedInMembers.map(m => (
-                  <div key={m.user_id} className="text-sm text-stone-gray">
-                    • {m.users.username || m.users.name}
-                    {m.role !== 'member' && <span className="text-xs ml-1">({m.role.replace('_', ' ')})</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* RSVP'd Yes but not checked in */}
-          {rsvpYesNotCheckedIn.length > 0 && (
-            <div className="mb-3">
-              <h3 className="font-semibold text-orange-700 mb-2">RSVP'd Yes - Not Checked In Yet ({rsvpYesNotCheckedIn.length}):</h3>
-              <div className="space-y-1">
-                {rsvpYesNotCheckedIn.map(m => (
-                  <div key={m.user_id} className="text-sm text-stone-gray">
-                    • {m.users.username || m.users.name}
-                    {m.role !== 'member' && <span className="text-xs ml-1">({m.role.replace('_', ' ')})</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* RSVP'd No */}
-          {rsvpNoMembers.length > 0 && (
-            <div className="mb-3">
-              <h3 className="font-semibold text-stone-gray mb-2">RSVP'd No ({rsvpNoMembers.length}):</h3>
-              <div className="space-y-1">
-                {rsvpNoMembers.map(m => (
-                  <div key={m.user_id} className="text-sm text-stone-gray">
-                    • {m.users.username || m.users.name}
-                    {m.rsvp_reason && <span className="text-xs ml-2 italic">({m.rsvp_reason})</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* No Response */}
-          {noResponseMembers.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-red-700 mb-2">No RSVP Response ({noResponseMembers.length}):</h3>
-              <div className="space-y-1">
-                {noResponseMembers.map(m => (
-                  <div key={m.user_id} className="text-sm text-stone-gray">
-                    • {m.users.username || m.users.name}
-                    {m.role !== 'member' && <span className="text-xs ml-1">({m.role.replace('_', ' ')})</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Start Meeting Form */}
-        <div className="bg-white rounded-lg p-6">
-          <h2 className="text-xl font-bold text-earth-brown mb-4">Ready to Start</h2>
-
-          {checkedInMembers.length === 0 ? (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
-              <p className="text-orange-800">
-                No members have checked in yet. You can still start the meeting, but consider waiting
-                a few more minutes for members to arrive and check in.
-              </p>
-            </div>
-          ) : null}
-
-          <StartMeetingForm
+        {/* Attendance and Start Meeting Section */}
+        {!isTooEarly && (
+          <StartMeetingSection
             meetingId={meetingId}
-            checkedInMembers={checkedInMembers.map(m => ({
-              id: m.user_id,
-              name: m.users.username || m.users.name,
-            }))}
+            initialAttendance={attendanceList || []}
+            allMembers={members || []}
             currentUserId={user.id}
             isLate={isLate}
-            minutesLate={minutesLate}
+            minutesLate={minutesDiff}
           />
-        </div>
+        )}
       </main>
     </div>
   );

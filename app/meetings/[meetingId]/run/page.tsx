@@ -114,7 +114,10 @@ export default async function MeetingRunnerPage({
 
   const handleLightningComplete = async () => {
     'use server'
+    console.log('[handleLightningComplete] Called')
+    console.log('[handleLightningComplete] About to call advanceSection with:', meetingId, 'full_checkins')
     await advanceSection(meetingId, 'full_checkins')
+    console.log('[handleLightningComplete] advanceSection completed')
   }
 
   const handlePersonComplete = async (

@@ -11,10 +11,36 @@ interface MeetingViewProps {
   meetingDate: string;
   checkedInAttendance: any[];
   notCheckedInMembers: any[];
+  housekeepingItems: any[];
+  rsvpData: any[];
+  isWithinThreeDays: boolean;
   isLeader: boolean;
   isScribe: boolean;
   currentUserId: string;
   currentUserName: string;
+}
+
+// Helper function to format minutes into natural units
+function formatTimeRemaining(minutes: number): string {
+  if (minutes <= 0) return 'now';
+
+  const days = Math.floor(minutes / (24 * 60));
+  const hours = Math.floor((minutes % (24 * 60)) / 60);
+  const mins = minutes % 60;
+
+  if (days > 0) {
+    if (hours > 0) {
+      return `${days} day${days > 1 ? 's' : ''} and ${hours} hour${hours > 1 ? 's' : ''}`;
+    }
+    return `${days} day${days > 1 ? 's' : ''}`;
+  } else if (hours > 0) {
+    if (mins > 0) {
+      return `${hours} hour${hours > 1 ? 's' : ''} and ${mins} minute${mins > 1 ? 's' : ''}`;
+    }
+    return `${hours} hour${hours > 1 ? 's' : ''}`;
+  } else {
+    return `${mins} minute${mins > 1 ? 's' : ''}`;
+  }
 }
 
 export default function MeetingView({
@@ -22,6 +48,9 @@ export default function MeetingView({
   meetingDate,
   checkedInAttendance: initialCheckedIn,
   notCheckedInMembers: initialNotCheckedIn,
+  housekeepingItems,
+  rsvpData,
+  isWithinThreeDays,
   isLeader,
   isScribe,
   currentUserId,
@@ -172,32 +201,33 @@ export default function MeetingView({
 
   const scribeName = meeting.scribe?.username || meeting.scribe?.name || 'Not assigned';
 
+  // Check if it's too early to start/check-in to the meeting (must be within 15 minutes)
+  const now = new Date();
+  const scheduledDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`);
+  const minutesUntilMeeting = Math.round((scheduledDateTime.getTime() - now.getTime()) / 60000);
+  const canStartMeeting = minutesUntilMeeting <= 15;
+  const canCheckIn = minutesUntilMeeting <= 15;
+
+  // Calculate check-in start time (15 minutes before scheduled time)
+  const checkInStartTime = new Date(scheduledDateTime.getTime() - 15 * 60 * 1000);
+  const checkInStartTimeStr = checkInStartTime.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
   return (
     <div className="min-h-screen bg-warm-cream">
-      {/* Header */}
-      <header className="bg-deep-charcoal text-warm-cream py-6 px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-start mb-4">
-            <Link href="/" className="text-sm text-warm-cream/80 hover:text-warm-cream">
-              ← Back to Dashboard
-            </Link>
-            <div className="text-right text-sm">
-              <p className="text-warm-cream/80">{currentUserName}</p>
-              <a href="/auth/logout" className="text-warm-cream/60 hover:text-warm-cream">
-                Sign Out
-              </a>
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold mb-2">{meeting.chapters.name} Meeting</h1>
-          <p className="text-warm-cream/80">{meetingDate} at {meeting.scheduled_time}</p>
+      <main className="max-w-5xl mx-auto py-8 px-8 space-y-6">
+        {/* Page Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-earth-brown mb-2">{meeting.chapters.name} Meeting</h1>
+          <p className="text-stone-gray">{meetingDate} at {meeting.scheduled_time}</p>
         </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto py-8 px-6 space-y-6">
         {/* Meeting Status */}
         <div className="bg-white rounded-lg p-6">
           <h2 className="text-xl font-bold text-earth-brown mb-4">Meeting Status</h2>
-          <div className="space-y-2">
+          <div className="space-y-2 mb-4">
             <p>
               <strong className="text-earth-brown">Status:</strong>{' '}
               <span className={`font-semibold ${statusColor}`}>{statusText}</span>
@@ -221,18 +251,138 @@ export default function MeetingView({
               </p>
             )}
           </div>
+
+          {/* Check In Button */}
+          {meeting.status !== 'completed' && meeting.status !== 'cancelled' && (
+            <div className="pt-4 border-t border-gray-200">
+              {canCheckIn ? (
+                <Link
+                  href={`/tasks/meeting-cycle/check-in?meeting=${meeting.id}`}
+                  className="inline-block bg-blue-600 text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Check In to Meeting
+                </Link>
+              ) : (
+                <div>
+                  <button
+                    disabled
+                    className="bg-gray-300 text-gray-500 py-2 px-6 rounded-lg font-semibold cursor-not-allowed"
+                  >
+                    Check In to Meeting
+                  </button>
+                  <p className="text-xs text-stone-gray mt-2">
+                    Check-in starts at {checkInStartTimeStr}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* RSVP Status (only if within 3 days) */}
+        {isWithinThreeDays && meeting.status === 'scheduled' && (
+          <div className="bg-white rounded-lg p-6">
+            <h2 className="text-xl font-bold text-earth-brown mb-4">RSVP Status</h2>
+
+            {/* Summary counts */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="text-center p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="text-2xl font-bold text-gray-600">
+                  {rsvpData.filter(m => m.rsvp_status === 'no_response').length}
+                </div>
+                <div className="text-xs text-gray-800">No Response</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {rsvpData.filter(m => m.rsvp_status === 'yes').length}
+                </div>
+                <div className="text-xs text-green-800">Yes</div>
+              </div>
+              <div className="text-center p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="text-2xl font-bold text-red-600">
+                  {rsvpData.filter(m => m.rsvp_status === 'no').length}
+                </div>
+                <div className="text-xs text-red-800">No</div>
+              </div>
+            </div>
+
+            {/* Member lists by RSVP status - Order: No Response, Yes, No */}
+            <div className="space-y-3">
+              {/* No Response */}
+              {rsvpData.filter(m => m.rsvp_status === 'no_response').length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-gray-700 mb-1">No Response:</h3>
+                  <p className="text-sm text-stone-gray">
+                    {rsvpData.filter(m => m.rsvp_status === 'no_response').map((m, index, arr) => (
+                      <span key={m.user_id}>
+                        {m.name}
+                        {m.role !== 'member' && <span className="text-xs"> ({m.role.replace('_', ' ')})</span>}
+                        {index < arr.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                  </p>
+                </div>
+              )}
+
+              {/* Yes */}
+              {rsvpData.filter(m => m.rsvp_status === 'yes').length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-green-700 mb-1">Yes:</h3>
+                  <p className="text-sm text-stone-gray">
+                    {rsvpData.filter(m => m.rsvp_status === 'yes').map((m, index, arr) => (
+                      <span key={m.user_id}>
+                        {m.name}
+                        {m.role !== 'member' && <span className="text-xs"> ({m.role.replace('_', ' ')})</span>}
+                        {index < arr.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                  </p>
+                </div>
+              )}
+
+              {/* No */}
+              {rsvpData.filter(m => m.rsvp_status === 'no').length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-red-700 mb-1">No:</h3>
+                  <p className="text-sm text-stone-gray">
+                    {rsvpData.filter(m => m.rsvp_status === 'no').map((m, index, arr) => (
+                      <span key={m.user_id}>
+                        {m.name}
+                        {m.rsvp_reason && <span className="text-xs italic"> ({m.rsvp_reason})</span>}
+                        {index < arr.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Leader Controls */}
         {isLeader && meeting.status === 'scheduled' && (
           <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-blue-900 mb-3">Leader Controls</h3>
-            <Link
-              href={`/tasks/meeting-cycle/start-meeting?meeting=${meeting.id}`}
-              className="inline-block bg-burnt-orange text-white py-3 px-6 rounded-lg font-semibold hover:bg-burnt-orange/90 transition-colors"
-            >
-              Start Meeting
-            </Link>
+            {canStartMeeting ? (
+              <Link
+                href={`/tasks/meeting-cycle/start-meeting?meeting=${meeting.id}`}
+                className="inline-block bg-burnt-orange text-white py-3 px-6 rounded-lg font-semibold hover:bg-burnt-orange/90 transition-colors"
+              >
+                Start Meeting
+              </Link>
+            ) : (
+              <div>
+                <button
+                  disabled
+                  className="bg-gray-300 text-gray-500 py-3 px-6 rounded-lg font-semibold cursor-not-allowed"
+                >
+                  Start Meeting
+                </button>
+                <p className="text-sm text-blue-800 mt-3">
+                  Meeting can be started 15 minutes before scheduled time ({formatTimeRemaining(minutesUntilMeeting)} remaining)
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -280,92 +430,33 @@ export default function MeetingView({
           </div>
         )}
 
-        {/* Attendance */}
-        <div className="bg-white rounded-lg p-6">
-          <h2 className="text-xl font-bold text-earth-brown mb-4">Attendance</h2>
-
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="text-3xl font-bold text-green-600">{checkedInAttendance.length}</div>
-              <div className="text-sm text-green-800">Checked In</div>
-            </div>
-            <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <div className="text-3xl font-bold text-orange-600">{notCheckedInMembers.length}</div>
-              <div className="text-sm text-orange-800">Not Yet</div>
-            </div>
-          </div>
-
-          {/* Checked In List */}
-          {checkedInAttendance.length > 0 && (
-            <div className="mb-4">
-              <h3 className="font-semibold text-green-700 mb-3">Checked In:</h3>
-              <div className="space-y-2">
-                {checkedInAttendance.map(a => (
-                  <div key={a.id} className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                    <div>
-                      <span className="font-medium text-earth-brown">
-                        {a.users.username || a.users.name}
-                      </span>
-                      {a.user_id === currentUserId && (
-                        <span className="ml-2 text-xs text-green-700">(You)</span>
-                      )}
-                    </div>
-                    <div className="text-right text-sm text-stone-gray">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          a.attendance_type === 'in_person'
-                            ? 'bg-green-200 text-green-800'
-                            : 'bg-blue-200 text-blue-800'
-                        }`}>
-                          {a.attendance_type === 'in_person' ? '🤝 In Person' : '📹 Video'}
-                        </span>
-                        <span className="text-xs">
-                          {new Date(a.checked_in_at).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })}
-                        </span>
-                      </div>
-                    </div>
+        {/* Housekeeping */}
+        {housekeepingItems.length > 0 && (
+          <div className="bg-white rounded-lg p-6">
+            <h2 className="text-xl font-bold text-earth-brown mb-4">Housekeeping</h2>
+            <div className="space-y-4">
+              {housekeepingItems.map((item) => (
+                <div key={item.id} className="p-4 bg-warm-cream/50 rounded-lg border-l-4 border-burnt-orange">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-earth-brown">{item.title}</h3>
+                    <span className="text-xs px-2 py-1 bg-burnt-orange/20 text-burnt-orange rounded">
+                      {item.item_type}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  {item.notes && (
+                    <p className="text-sm text-stone-gray whitespace-pre-wrap">{item.notes}</p>
+                  )}
+                  {item.users && (
+                    <p className="text-xs text-stone-gray mt-2">
+                      Related to: {item.users.username || item.users.name}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
-
-          {/* Not Checked In List */}
-          {notCheckedInMembers.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-orange-700 mb-3">Not Checked In Yet:</h3>
-              <div className="space-y-1">
-                {notCheckedInMembers.map(m => (
-                  <div key={m.user_id} className="text-sm text-stone-gray p-2 bg-orange-50 rounded">
-                    • {m.users.username || m.users.name}
-                    {m.user_id === currentUserId && (
-                      <span className="ml-2 text-xs text-orange-700">(You)</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Check-in Link (if not checked in and meeting in progress or scheduled) */}
-        {meeting.status !== 'completed' && meeting.status !== 'cancelled' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-            <p className="text-blue-900 mb-3">
-              {meeting.status === 'in_progress' ? 'Join the meeting:' : 'Get ready for the meeting:'}
-            </p>
-            <Link
-              href={`/tasks/meeting-cycle/check-in?meeting=${meeting.id}`}
-              className="inline-block bg-blue-600 text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Check In
-            </Link>
           </div>
         )}
+
       </main>
     </div>
   );

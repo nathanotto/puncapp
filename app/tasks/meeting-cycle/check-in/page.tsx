@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { Sidebar } from '@/components/layout/Sidebar';
 import CheckInForm from './CheckInForm';
+import ChangeCheckInTypeLink from './ChangeCheckInTypeLink';
 
 interface CheckInPageProps {
   searchParams: Promise<{ meeting: string }>;
@@ -43,6 +45,7 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
   const { meeting: meetingId } = params;
 
   if (!meetingId) {
+    // Can't get sidebar data yet since we don't have user
     return (
       <div className="min-h-screen bg-warm-cream py-12 px-6">
         <div className="max-w-2xl mx-auto">
@@ -64,12 +67,27 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
     redirect('/auth/login');
   }
 
-  // Get user's name
+  // Get user's name and chapter memberships for sidebar
   const { data: userData } = await supabase
     .from('users')
     .select('name, username')
     .eq('id', user.id)
     .single();
+
+  const { data: memberships } = await supabase
+    .from('chapter_memberships')
+    .select(`
+      chapter_id,
+      role,
+      chapters!inner (
+        id,
+        name
+      )
+    `)
+    .eq('user_id', user.id)
+    .eq('is_active', true);
+
+  const userName = userData?.username || userData?.name || 'Member';
 
   // Get meeting with chapter info
   const { data: meeting, error: meetingError } = await supabase
@@ -90,38 +108,48 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
     .eq('id', meetingId)
     .single();
 
+  const firstChapter = memberships && memberships.length > 0 ? memberships[0].chapters : null;
+
   if (meetingError || !meeting) {
     return (
-      <div className="min-h-screen bg-warm-cream py-12 px-6">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-earth-brown mb-4">Meeting not found</h1>
-          <Link href="/" className="text-burnt-orange hover:underline">
-            Back to Dashboard
-          </Link>
-        </div>
+      <div className="flex min-h-screen bg-warm-cream">
+        <Sidebar
+          userName={userName}
+          chapterId={firstChapter?.id}
+          chapterName={firstChapter?.name}
+        />
+        <main className="flex-1 py-8 px-8">
+          <div className="max-w-2xl mx-auto">
+            <h1 className="text-2xl font-bold text-earth-brown mb-4">Meeting not found</h1>
+            <Link href="/" className="text-burnt-orange hover:underline">
+              Back to Dashboard
+            </Link>
+          </div>
+        </main>
       </div>
     );
   }
 
   // Check user is member of this chapter
-  const { data: membership } = await supabase
-    .from('chapter_memberships')
-    .select('role')
-    .eq('chapter_id', meeting.chapter_id)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single();
+  const membership = memberships?.find(m => m.chapter_id === meeting.chapter_id);
 
   if (!membership) {
     return (
-      <div className="min-h-screen bg-warm-cream py-12 px-6">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-earth-brown mb-4">Access denied</h1>
-          <p className="text-stone-gray mb-4">You are not a member of this chapter.</p>
-          <Link href="/" className="text-burnt-orange hover:underline">
-            Back to Dashboard
-          </Link>
-        </div>
+      <div className="flex min-h-screen bg-warm-cream">
+        <Sidebar
+          userName={userName}
+          chapterId={firstChapter?.id}
+          chapterName={firstChapter?.name}
+        />
+        <main className="flex-1 py-8 px-8">
+          <div className="max-w-2xl mx-auto">
+            <h1 className="text-2xl font-bold text-earth-brown mb-4">Access denied</h1>
+            <p className="text-stone-gray mb-4">You are not a member of this chapter.</p>
+            <Link href="/" className="text-burnt-orange hover:underline">
+              Back to Dashboard
+            </Link>
+          </div>
+        </main>
       </div>
     );
   }
@@ -137,6 +165,9 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
   const alreadyCheckedIn = attendance?.checked_in_at != null;
   const window = isCheckInWindowOpen(meeting);
 
+  // Check if user is a leader or backup leader
+  const isLeader = membership.role === 'leader' || membership.role === 'backup_leader';
+
   // Combine date and time to avoid timezone issues
   const meetingDateTime = combineDateAndTime(meeting.scheduled_date, meeting.scheduled_time);
   const meetingDate = meetingDateTime.toLocaleDateString('en-US', {
@@ -149,27 +180,20 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
   const meetingInProgress = meeting.status === 'in_progress';
 
   return (
-    <div className="min-h-screen bg-warm-cream">
-      {/* Header */}
-      <header className="bg-deep-charcoal text-warm-cream py-6 px-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex justify-between items-start mb-4">
-            <Link href="/" className="text-sm text-warm-cream/80 hover:text-warm-cream">
-              ← Back to Dashboard
-            </Link>
-            <div className="text-right text-sm">
-              <p className="text-warm-cream/80">{userData?.username || userData?.name || 'Member'}</p>
-              <a href="/auth/logout" className="text-warm-cream/60 hover:text-warm-cream">
-                Sign Out
-              </a>
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold mb-2">Check In to Meeting</h1>
-          <p className="text-warm-cream/80">{meeting.chapters.name} • {meetingDate} at {meeting.scheduled_time}</p>
-        </div>
-      </header>
+    <div className="flex min-h-screen bg-warm-cream">
+      <Sidebar
+        userName={userName}
+        chapterId={meeting.chapter_id}
+        chapterName={meeting.chapters.name}
+      />
 
-      <main className="max-w-2xl mx-auto py-8 px-6">
+      <main className="flex-1 py-8 px-8">
+        <div className="max-w-3xl mx-auto">
+          {/* Page Header */}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-earth-brown mb-2">Check In to Meeting</h1>
+            <p className="text-stone-gray">{meeting.chapters.name} • {meetingDate} at {meeting.scheduled_time}</p>
+          </div>
         {/* Meeting Status */}
         <div className="bg-white rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold text-earth-brown mb-4">Meeting Details</h2>
@@ -197,9 +221,29 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
                 hour12: true
               })}
             </p>
-            <p className="text-green-700">
+            <p className="text-green-700 mb-3">
               <strong>Type:</strong> {attendance.attendance_type === 'in_person' ? 'In Person' : 'Video'}
             </p>
+
+            {/* Toggle check-in type */}
+            <div className="mb-4">
+              <ChangeCheckInTypeLink
+                meetingId={meetingId}
+                currentType={attendance.attendance_type}
+              />
+            </div>
+
+            {/* Start Meeting button for leaders */}
+            {isLeader && meeting.status === 'scheduled' && (
+              <div className="pt-4 border-t border-green-300">
+                <Link
+                  href={`/tasks/meeting-cycle/start-meeting?meeting=${meetingId}`}
+                  className="inline-block bg-burnt-orange text-white py-3 px-6 rounded-lg font-semibold hover:bg-burnt-orange/90 transition-colors"
+                >
+                  Start Meeting
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
@@ -225,17 +269,7 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
             )}
           </div>
         )}
-
-        {/* Already checked in - option to change type */}
-        {alreadyCheckedIn && window.open && (
-          <div className="bg-white rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-earth-brown mb-3">Change Check-in Type</h3>
-            <p className="text-sm text-stone-gray mb-4">
-              Need to update how you're attending?
-            </p>
-            <CheckInForm meetingId={meetingId} isUpdate={true} />
-          </div>
-        )}
+        </div>
       </main>
     </div>
   );

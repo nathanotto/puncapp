@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import PendingTasksList from '@/components/task/PendingTasksList';
 import { DeleteMeetingButton } from '@/components/meeting/DeleteMeetingButton';
 import { RescheduleMeetingButton } from '@/components/meeting/RescheduleMeetingButton';
+import { Sidebar } from '@/components/layout/Sidebar';
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -21,10 +22,17 @@ export default async function HomePage() {
     .eq('id', user.id)
     .single();
 
-  // Get user's chapter memberships with roles
+  // Get user's chapter memberships with roles and chapter info
   const { data: memberships } = await supabase
     .from('chapter_memberships')
-    .select('chapter_id, role')
+    .select(`
+      chapter_id,
+      role,
+      chapters!inner (
+        id,
+        name
+      )
+    `)
     .eq('user_id', user.id)
     .eq('is_active', true);
 
@@ -32,6 +40,9 @@ export default async function HomePage() {
 
   // Create a map of chapter_id -> role for easy lookup
   const userChapterRoles = new Map(memberships?.map(m => [m.chapter_id, m.role]) || []);
+
+  const userName = userData?.username || userData?.name || 'Member'
+  const firstChapter = memberships && memberships.length > 0 ? memberships[0].chapters : null
 
   // Helper function to format role display
   const formatRole = (role: string) => {
@@ -63,7 +74,7 @@ export default async function HomePage() {
   const today = new Date().toISOString().split('T')[0];
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  const { data: upcomingMeetings } = await supabase
+  const { data: allScheduledMeetings } = await supabase
     .from('meetings')
     .select(`
       id,
@@ -83,6 +94,31 @@ export default async function HomePage() {
     .lte('scheduled_date', sevenDaysFromNow)
     .order('scheduled_date', { ascending: true })
     .order('scheduled_time', { ascending: true });
+
+  // Get user's attendance for these meetings
+  const scheduledMeetingIds = allScheduledMeetings?.map(m => m.id) || [];
+  const { data: userAttendance } = await supabase
+    .from('attendance')
+    .select('meeting_id, checked_in_at')
+    .eq('user_id', user.id)
+    .in('meeting_id', scheduledMeetingIds);
+
+  // Create a map of meeting_id -> checked_in_at
+  const attendanceMap = new Map(userAttendance?.map(a => [a.meeting_id, a.checked_in_at]) || []);
+
+  // Separate meetings into "In Progress" (time has started) and "Upcoming" (time hasn't started)
+  const now = new Date();
+  const meetingsStartedNotInProgress: any[] = [];
+  const upcomingMeetings: any[] = [];
+
+  allScheduledMeetings?.forEach(meeting => {
+    const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`);
+    if (now >= meetingDateTime) {
+      meetingsStartedNotInProgress.push(meeting);
+    } else {
+      upcomingMeetings.push(meeting);
+    }
+  });
 
   // Get all past meetings (completed, incomplete, never_started, timed_out)
   const { data: pastMeetings } = await supabase
@@ -104,27 +140,18 @@ export default async function HomePage() {
     .order('scheduled_time', { ascending: false });
 
   return (
-    <div className="min-h-screen bg-warm-cream">
-      {/* Header */}
-      <header className="bg-deep-charcoal text-warm-cream py-6 px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-end mb-4">
-            <div className="text-right text-sm">
-              <p className="text-warm-cream/80">{userData?.username || userData?.name || 'Member'}</p>
-              <a href="/auth/logout" className="text-warm-cream/60 hover:text-warm-cream">
-                Sign Out
-              </a>
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold mb-2">
-            Welcome back, {userData?.name || 'Member'}
-          </h1>
-          <p className="text-warm-cream/80">Here's what needs your attention</p>
-        </div>
-      </header>
+    <div className="flex min-h-screen bg-warm-cream">
+      <Sidebar
+        userName={userName}
+        chapterId={firstChapter?.id}
+        chapterName={firstChapter?.name}
+      />
 
       {/* Main content */}
-      <main className="max-w-4xl mx-auto py-8 px-6">
+      <main className="flex-1 py-8 px-8">
+        <div className="max-w-5xl mx-auto">
+          <h1 className="text-3xl font-bold text-earth-brown mb-2">Dashboard</h1>
+          <p className="text-stone-gray mb-8">Welcome back, {userData?.name || 'Member'}</p>
         {/* Pending Tasks */}
         <div className="mb-8">
           <h2 className="text-2xl font-semibold text-earth-brown mb-4">
@@ -176,6 +203,77 @@ export default async function HomePage() {
           </div>
         )}
 
+        {/* Meetings In Progress (scheduled time has started but not formally started) */}
+        {meetingsStartedNotInProgress && meetingsStartedNotInProgress.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-earth-brown mb-4">Meetings In Progress</h2>
+            <div className="space-y-4">
+              {meetingsStartedNotInProgress.map(meeting => {
+                const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`);
+                const dateStr = meetingDateTime.toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric'
+                });
+                const timeStr = meetingDateTime.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                });
+
+                const userRole = userChapterRoles.get(meeting.chapters.id);
+                const isLeaderOrBackup = userRole === 'leader' || userRole === 'backup_leader';
+                const hasCheckedIn = attendanceMap.has(meeting.id) && attendanceMap.get(meeting.id) !== null;
+
+                return (
+                  <div key={meeting.id} className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-earth-brown">
+                          {meeting.chapters.name}
+                          {userRole && <span className="text-sm font-normal text-stone-gray ml-2">({formatRole(userRole)})</span>}
+                        </h3>
+                        <p className="text-sm text-orange-800">
+                          {dateStr} at {timeStr}
+                        </p>
+                        <p className="text-sm text-stone-gray">{meeting.location}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        {hasCheckedIn ? (
+                          <div className="bg-green-100 text-green-800 py-2 px-4 rounded-lg text-sm font-semibold border-2 border-green-300">
+                            ✓ Checked In
+                          </div>
+                        ) : (
+                          <a
+                            href={`/tasks/meeting-cycle/check-in?meeting=${meeting.id}`}
+                            className="bg-burnt-orange text-white py-2 px-4 rounded-lg text-sm font-semibold hover:bg-burnt-orange/90 transition-colors"
+                          >
+                            Check In
+                          </a>
+                        )}
+                        {isLeaderOrBackup && (
+                          <a
+                            href={`/tasks/meeting-cycle/start-meeting?meeting=${meeting.id}`}
+                            className="bg-burnt-orange text-white py-2 px-4 rounded-lg text-sm font-semibold hover:bg-burnt-orange/90 transition-colors"
+                          >
+                            Start Meeting
+                          </a>
+                        )}
+                        <a
+                          href={`/meetings/${meeting.id}`}
+                          className="bg-gray-100 text-earth-brown py-2 px-4 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors"
+                        >
+                          View
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Upcoming Meetings */}
         {upcomingMeetings && upcomingMeetings.length > 0 && (
           <div className="mb-8">
@@ -205,6 +303,7 @@ export default async function HomePage() {
 
                 const userRole = userChapterRoles.get(meeting.chapters.id);
                 const isLeaderOrBackup = userRole === 'leader' || userRole === 'backup_leader';
+                const hasCheckedIn = attendanceMap.has(meeting.id) && attendanceMap.get(meeting.id) !== null;
 
                 return (
                   <div key={meeting.id} className="bg-white border border-gray-200 rounded-lg p-4">
@@ -221,12 +320,18 @@ export default async function HomePage() {
                       </div>
                       <div className="flex gap-2">
                         {canCheckIn && (
-                          <a
-                            href={`/tasks/meeting-cycle/check-in?meeting=${meeting.id}`}
-                            className="bg-burnt-orange text-white py-2 px-4 rounded-lg text-sm font-semibold hover:bg-burnt-orange/90 transition-colors"
-                          >
-                            Check In
-                          </a>
+                          hasCheckedIn ? (
+                            <div className="bg-green-100 text-green-800 py-2 px-4 rounded-lg text-sm font-semibold border-2 border-green-300">
+                              ✓ Checked In
+                            </div>
+                          ) : (
+                            <a
+                              href={`/tasks/meeting-cycle/check-in?meeting=${meeting.id}`}
+                              className="bg-burnt-orange text-white py-2 px-4 rounded-lg text-sm font-semibold hover:bg-burnt-orange/90 transition-colors"
+                            >
+                              Check In
+                            </a>
+                          )
                         )}
                         <a
                           href={`/meetings/${meeting.id}`}
@@ -341,6 +446,7 @@ export default async function HomePage() {
             </div>
           </div>
         )}
+        </div>
       </main>
     </div>
   );

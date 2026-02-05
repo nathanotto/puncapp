@@ -274,6 +274,36 @@ export function TesterPanel({
     setIsLoading(false);
   }
 
+  async function debugMeetingState() {
+    const meetingId = currentMeeting?.id || pathname.match(/\/meetings\/([^/]+)/)?.[1];
+
+    if (!meetingId) {
+      setLastResult('✗ Not on a meeting page');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/tester/debug-meeting-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        console.log('[TESTER DEBUG] Meeting State:', data.state);
+        setLastResult(`✓ Check console for meeting state`);
+      } else {
+        setLastResult(`✗ ${data.error}`);
+      }
+    } catch (error) {
+      setLastResult(`✗ Failed: ${error}`);
+    }
+    setIsLoading(false);
+  }
+
   async function accelerateLightning() {
     const meetingId = currentMeeting?.id || pathname.match(/\/meetings\/([^/]+)/)?.[1];
 
@@ -528,6 +558,13 @@ export function TesterPanel({
                   className="w-full px-2 py-1 bg-green-700 hover:bg-green-600 rounded text-xs disabled:opacity-50"
                 >
                   Complete All Meeting Feedback
+                </button>
+                <button
+                  onClick={debugMeetingState}
+                  disabled={isLoading}
+                  className="w-full px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded text-xs disabled:opacity-50"
+                >
+                  🔍 Debug Meeting State
                 </button>
               </div>
             )}

@@ -6,6 +6,7 @@ interface ActionResult {
   success: boolean;
   message: string;
   consequence?: string;
+  redirect?: string;
   nextStep?: {
     description: string;
     href: string;
@@ -32,23 +33,12 @@ export async function logOutreach(formData: FormData): Promise<ActionResult> {
   // 1. Get the attendance record to find meeting and member
   const { data: attendance, error: attendanceError } = await supabase
     .from('attendance')
-    .select(`
-      id,
-      user_id,
-      meeting_id,
-      users!inner (
-        name,
-        username
-      ),
-      meetings!inner (
-        id,
-        chapter_id
-      )
-    `)
+    .select('id, user_id, meeting_id')
     .eq('id', attendanceId)
     .single();
 
   if (attendanceError || !attendance) {
+    console.error('Attendance lookup error:', { attendanceError, attendanceId });
     return {
       success: false,
       message: 'Attendance record not found',
@@ -56,17 +46,23 @@ export async function logOutreach(formData: FormData): Promise<ActionResult> {
     };
   }
 
-  const memberName = attendance.users.username || attendance.users.name;
+  // Get member info
+  const { data: member } = await supabase
+    .from('users')
+    .select('name, username')
+    .eq('id', attendance.user_id)
+    .single();
+
+  const memberName = member?.username || member?.name || 'Member';
 
   // 2. Update attendance record with outreach notes
+  // DO NOT change rsvp_status - it stays "no_response" until actual RSVP is recorded
   const { error: updateError } = await supabase
     .from('attendance')
     .update({
       leader_outreach_logged_at: new Date().toISOString(),
       leader_outreach_notes: notes,
       leader_outreach_by: user.id,
-      // Mark as resolved (not a true RSVP, but addressed)
-      rsvp_status: 'no', // Default to "not coming" – leader's note explains
     })
     .eq('id', attendanceId);
 
@@ -77,35 +73,10 @@ export async function logOutreach(formData: FormData): Promise<ActionResult> {
     };
   }
 
-  // 3. Complete the leader's contact task
-  const { error: taskError } = await supabase
-    .from('pending_tasks')
-    .update({ completed_at: new Date().toISOString() })
-    .eq('id', taskId);
+  // 3. DO NOT complete the tasks - they stay open until actual RSVP is recorded
+  // The task remains on the leader's dashboard
 
-  if (taskError) {
-    console.error('Failed to complete task:', taskError);
-  }
-
-  // 4. Complete the member's RSVP task (if still open)
-  await supabase
-    .from('pending_tasks')
-    .update({ completed_at: new Date().toISOString() })
-    .eq('task_type', 'respond_to_rsvp')
-    .eq('assigned_to', attendance.user_id)
-    .eq('related_entity_id', attendance.meeting_id)
-    .is('completed_at', null);
-
-  // 5. Also complete any other leader's contact task for same member
-  await supabase
-    .from('pending_tasks')
-    .update({ completed_at: new Date().toISOString() })
-    .eq('task_type', 'contact_unresponsive_member')
-    .eq('related_entity_id', attendanceId)
-    .is('completed_at', null)
-    .neq('id', taskId); // Don't update the current task again
-
-  // 6. Create agenda item for the meeting
+  // 3. Create agenda item for the meeting
   const { error: agendaError } = await supabase
     .from('meeting_agenda_items')
     .insert({
@@ -125,11 +96,148 @@ export async function logOutreach(formData: FormData): Promise<ActionResult> {
   return {
     success: true,
     message: 'Outreach logged',
-    consequence: `${memberName}'s RSVP task has been resolved. This will be noted at the meeting.`,
-    nextStep: {
-      description: 'Back to Dashboard',
-      href: '/dashboard',
-      label: 'Dashboard',
-    },
+    consequence: `Your notes about ${memberName} have been logged and will be noted at the meeting. The task remains open until an RSVP is recorded.`,
+  };
+}
+
+export async function rsvpForMember(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const attendanceId = formData.get('attendanceId') as string;
+  const rsvpStatus = formData.get('rsvpStatus') as 'yes' | 'no';
+  const taskId = formData.get('taskId') as string;
+
+  // Get current user (the leader)
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      success: false,
+      message: 'Not authenticated',
+    };
+  }
+
+  // Get the attendance record
+  const { data: attendance, error: attendanceError } = await supabase
+    .from('attendance')
+    .select('id, user_id, meeting_id')
+    .eq('id', attendanceId)
+    .single();
+
+  if (attendanceError || !attendance) {
+    console.error('Attendance lookup error:', { attendanceError, attendanceId });
+    return {
+      success: false,
+      message: `Attendance record not found: ${attendanceError?.message || 'Unknown error'}`,
+    };
+  }
+
+  // Get member info
+  const { data: member } = await supabase
+    .from('users')
+    .select('name, username')
+    .eq('id', attendance.user_id)
+    .single();
+
+  const memberName = member?.username || member?.name || 'Member';
+
+  // Update attendance with RSVP
+  const { error: updateError } = await supabase
+    .from('attendance')
+    .update({
+      rsvp_status: rsvpStatus,
+      rsvp_at: new Date().toISOString(),
+    })
+    .eq('id', attendanceId);
+
+  if (updateError) {
+    return {
+      success: false,
+      message: `Failed to update RSVP: ${updateError.message}`,
+    };
+  }
+
+  // Complete the leader's contact task
+  await supabase
+    .from('pending_tasks')
+    .update({ completed_at: new Date().toISOString() })
+    .eq('id', taskId);
+
+  // Complete the member's RSVP task
+  await supabase
+    .from('pending_tasks')
+    .update({ completed_at: new Date().toISOString() })
+    .eq('task_type', 'respond_to_rsvp')
+    .eq('assigned_to', attendance.user_id)
+    .eq('related_entity_id', attendance.meeting_id)
+    .is('completed_at', null);
+
+  return {
+    success: true,
+    message: `RSVP'd ${rsvpStatus} for ${memberName}`,
+    redirect: '/',
+  };
+}
+
+export async function createFollowUpCommitment(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const attendanceId = formData.get('attendanceId') as string;
+  const commitmentDescription = formData.get('commitmentDescription') as string;
+
+  // Get current user (the leader)
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      success: false,
+      message: 'Not authenticated',
+    };
+  }
+
+  // Get the attendance record to find meeting info
+  const { data: attendance, error: attendanceError } = await supabase
+    .from('attendance')
+    .select('id, user_id, meeting_id')
+    .eq('id', attendanceId)
+    .single();
+
+  if (attendanceError || !attendance) {
+    console.error('Attendance lookup error:', { attendanceError, attendanceId });
+    return {
+      success: false,
+      message: 'Attendance record not found',
+    };
+  }
+
+  // Get member info
+  const { data: member } = await supabase
+    .from('users')
+    .select('name, username')
+    .eq('id', attendance.user_id)
+    .single();
+
+  const memberName = member?.username || member?.name || 'Member';
+
+  // Create commitment for the leader
+  const { error: commitmentError } = await supabase
+    .from('commitments')
+    .insert({
+      committer_id: user.id,
+      commitment_type: 'support_a_man',
+      description: commitmentDescription,
+      status: 'active',
+      created_at_meeting_id: attendance.meeting_id,
+      receiver_id: attendance.user_id,
+    });
+
+  if (commitmentError) {
+    return {
+      success: false,
+      message: `Failed to create commitment: ${commitmentError.message}`,
+    };
+  }
+
+  return {
+    success: true,
+    message: `Commitment created to follow up with ${memberName}`,
   };
 }

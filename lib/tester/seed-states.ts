@@ -459,10 +459,11 @@ async function seedRsvpOneDayOak(supabase: SupabaseClient) {
     rsvp_deadline: new Date().toISOString().split('T')[0], // Deadline is now
   });
 
-  const oakMembers = TEST_USERS.filter(u => u.chapter === 'oak').map(u => u.id);
+  const oakMembers = TEST_USERS.filter(u => u.chapter === 'oak');
 
-  // Most have responded, 2 have not
-  const unresponsive = [oakMembers[0], oakMembers[1]]; // Apollo and Atlas
+  // Most have responded, 2 have not - Atlas (index 1) and Ares (index 2)
+  const unresponsiveMemberIds = [oakMembers[1].id, oakMembers[2].id]; // Atlas and Ares
+  const unresponsiveMembers = [oakMembers[1], oakMembers[2]]; // Keep full objects for names
 
   // Nathan responded yes
   await supabase.from('attendance').insert({
@@ -472,26 +473,40 @@ async function seedRsvpOneDayOak(supabase: SupabaseClient) {
   });
 
   for (let i = 0; i < oakMembers.length; i++) {
-    const userId = oakMembers[i];
-    const isUnresponsive = unresponsive.includes(userId);
+    const member = oakMembers[i];
+    const userId = member.id;
+    const isUnresponsive = unresponsiveMemberIds.includes(userId);
 
-    await supabase.from('attendance').insert({
+    const { data: attendanceRecord, error: insertError } = await supabase.from('attendance').insert({
       meeting_id: meetingId,
       user_id: userId,
       rsvp_status: isUnresponsive ? 'no_response' : (i % 3 === 0 ? 'no' : 'yes'),
       rsvp_reason: i % 3 === 0 && !isUnresponsive ? 'Family commitment' : null,
       reminder_sent_at: isUnresponsive ? new Date().toISOString() : null,
-    });
+    }).select('id').single();
+
+    if (insertError) {
+      console.error('Error inserting attendance for', member.name, insertError);
+    }
 
     // Create leader outreach task for unresponsive
-    if (isUnresponsive) {
-      await supabase.from('pending_tasks').insert({
+    if (isUnresponsive && attendanceRecord) {
+      const { error: taskError } = await supabase.from('pending_tasks').insert({
         task_type: 'contact_unresponsive_member',
         assigned_to: NATHAN_ID,
         related_entity_type: 'attendance',
-        related_entity_id: meetingId,
-        metadata: { member_id: userId },
+        related_entity_id: attendanceRecord.id,
+        metadata: {
+          member_id: userId,
+          member_name: member.name
+        },
       });
+
+      if (taskError) {
+        console.error('Error creating task for', member.name, taskError);
+      } else {
+        console.log('Created contact task for', member.name, 'with attendance ID:', attendanceRecord.id);
+      }
     }
   }
 }

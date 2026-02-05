@@ -79,6 +79,18 @@ export function FullCheckin({
 
   const completedUserIds = new Set(completedLogs.map(l => l.user_id))
   const activeQueue = localQueue.filter(q => !q.skipped)
+
+  async function handleRoundComplete() {
+    console.log('[FullCheckin] handleRoundComplete called');
+    try {
+      await onRoundComplete();
+      console.log('[FullCheckin] onRoundComplete succeeded, reloading page...');
+      window.location.reload();
+    } catch (error) {
+      console.error('[FullCheckin] Error completing round:', error);
+      alert(`Failed to advance to next section: ${error}`);
+    }
+  }
   const currentPerson = activeQueue.find(q => !completedUserIds.has(q.user_id))
   const currentStretchGoal = currentPerson ? stretchGoals[currentPerson.user_id] : null
 
@@ -201,7 +213,7 @@ export function FullCheckin({
         )}
         {isScribe && (
           <button
-            onClick={onRoundComplete}
+            onClick={handleRoundComplete}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
           >
             {curriculumDitched ? 'Proceed to Closing →' : 'Proceed to Curriculum →'}

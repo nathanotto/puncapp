@@ -109,10 +109,17 @@ export async function changeScribe(meetingId: string, newScribeId: string) {
 }
 
 export async function advanceSection(meetingId: string, newSection: string) {
+  console.log(`[advanceSection] Called with meetingId: ${meetingId}, newSection: ${newSection}`);
+
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  if (!user) {
+    console.error('[advanceSection] Not authenticated');
+    throw new Error('Not authenticated');
+  }
+
+  console.log(`[advanceSection] User authenticated: ${user.id}`);
 
   // Verify user is scribe
   const { data: meeting } = await supabase
@@ -121,24 +128,33 @@ export async function advanceSection(meetingId: string, newSection: string) {
     .eq('id', meetingId)
     .single()
 
+  console.log(`[advanceSection] Meeting data:`, meeting);
+
   if (meeting?.scribe_id !== user.id) {
-    throw new Error('Only the Scribe can advance sections')
+    console.error(`[advanceSection] User ${user.id} is not scribe ${meeting?.scribe_id}`);
+    throw new Error('Only the Scribe can advance sections');
   }
 
   const now = new Date().toISOString()
 
   // End the current section's time log
   if (meeting.current_section && meeting.current_section !== 'not_started') {
-    await supabase
+    console.log(`[advanceSection] Ending current section: ${meeting.current_section}`);
+    const { error } = await supabase
       .from('meeting_time_log')
       .update({ end_time: now })
       .eq('meeting_id', meetingId)
       .eq('section', meeting.current_section)
       .is('end_time', null)
       .is('user_id', null) // Section-level log, not person-level
+
+    if (error) {
+      console.error('[advanceSection] Error ending section log:', error);
+    }
   }
 
   // Start new section's time log
+  console.log(`[advanceSection] Starting new section log: ${newSection}`);
   const { error: insertError } = await supabase.from('meeting_time_log').insert({
     meeting_id: meetingId,
     section: newSection,
@@ -146,22 +162,23 @@ export async function advanceSection(meetingId: string, newSection: string) {
   })
 
   if (insertError) {
-    console.error('Error inserting time log:', insertError)
+    console.error('[advanceSection] Error inserting time log:', insertError)
     throw new Error(`Failed to insert time log: ${insertError.message}`)
   }
 
-  // Update meeting's current section using the database function
-  const { error: updateError } = await supabase.rpc('advance_meeting_section', {
-    p_meeting_id: meetingId,
-    p_new_section: newSection
-  })
+  // Update meeting's current section
+  console.log(`[advanceSection] Updating meeting current_section to: ${newSection}`);
+  const { error: updateError } = await supabase
+    .from('meetings')
+    .update({ current_section: newSection })
+    .eq('id', meetingId)
 
   if (updateError) {
-    console.error('Error updating meeting section:', updateError)
+    console.error('[advanceSection] Error updating meeting section:', updateError)
     throw new Error(`Failed to update meeting: ${updateError.message}`)
   }
 
-  console.log(`✓ Advanced meeting ${meetingId} to ${newSection}`)
+  console.log(`[advanceSection] ✓ Successfully advanced meeting ${meetingId} to ${newSection}`)
   revalidatePath(`/meetings/${meetingId}/run`)
 }
 

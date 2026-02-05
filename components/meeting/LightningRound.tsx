@@ -139,16 +139,27 @@ export function LightningRound({
   }
 
   async function handleRoundComplete() {
-    if (isCompleting) return
+    console.log('[LightningRound] handleRoundComplete called');
+    console.log('[LightningRound] isCompleting:', isCompleting);
 
-    setIsCompleting(true)
+    if (isCompleting) {
+      console.log('[LightningRound] Already completing, returning');
+      return;
+    }
+
+    setIsCompleting(true);
+    console.log('[LightningRound] Calling onRoundComplete...');
+
     try {
-      await onRoundComplete()
+      await onRoundComplete();
+      console.log('[LightningRound] onRoundComplete succeeded');
+      console.log('[LightningRound] Forcing page reload...');
+      // Force a hard refresh to ensure the UI updates
+      window.location.reload();
     } catch (error) {
-      console.error('Error completing round:', error)
-      alert('Failed to advance to next section.')
-    } finally {
-      setIsCompleting(false)
+      console.error('[LightningRound] Error completing round:', error);
+      alert(`Failed to advance to next section: ${error}`);
+      setIsCompleting(false);
     }
   }
 
