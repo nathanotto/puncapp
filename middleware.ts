@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   // Public routes that don't require auth
-  const publicRoutes = ['/auth/login', '/auth/signup', '/']
+  const publicRoutes = ['/auth/login', '/auth/signup']
   if (publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
     return NextResponse.next()
   }
