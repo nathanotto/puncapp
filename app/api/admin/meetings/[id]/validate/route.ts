@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createClient();
 
   // Check authentication
@@ -28,7 +29,7 @@ export async function POST(
   const { data: meeting } = await supabase
     .from('meetings')
     .select('id, validation_status')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (!meeting) {
@@ -69,7 +70,7 @@ export async function POST(
       admin_validation_notes: notes || null,
       validation_status: newStatus,
     })
-    .eq('id', params.id);
+    .eq('id', id);
 
   if (updateError) {
     console.error('Error updating meeting validation:', updateError);

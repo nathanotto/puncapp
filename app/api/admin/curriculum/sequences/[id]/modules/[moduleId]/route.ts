@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string; moduleId: string } }
+  { params }: { params: Promise<{ id: string; moduleId: string }> }
 ) {
+  const { id, moduleId } = await params;
   const supabase = await createClient();
 
   // Check admin access
@@ -34,7 +35,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from('curriculum_module_sequences')
     .update({ order_in_sequence })
-    .eq('id', params.moduleId)
+    .eq('id', moduleId)
     .select()
     .single();
 
@@ -48,8 +49,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; moduleId: string } }
+  { params }: { params: Promise<{ id: string; moduleId: string }> }
 ) {
+  const { id, moduleId } = await params;
   const supabase = await createClient();
 
   // Check admin access
@@ -72,7 +74,7 @@ export async function DELETE(
   const { error } = await supabase
     .from('curriculum_module_sequences')
     .delete()
-    .eq('id', params.moduleId);
+    .eq('id', moduleId);
 
   if (error) {
     console.error('Error removing module from sequence:', error);

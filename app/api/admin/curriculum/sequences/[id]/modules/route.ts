@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createClient();
 
   // Check admin access
@@ -33,7 +34,7 @@ export async function POST(
   const { data, error } = await supabase
     .from('curriculum_module_sequences')
     .insert({
-      sequence_id: params.id,
+      sequence_id: id,
       module_id,
       order_in_sequence: order_in_sequence || 0,
     })

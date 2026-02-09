@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createClient();
 
   // Check admin access
@@ -26,7 +27,7 @@ export async function GET(
   const { data, error } = await supabase
     .from('curriculum_modules')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (error) {
@@ -38,8 +39,9 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createClient();
 
   // Check admin access
@@ -85,7 +87,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from('curriculum_modules')
     .update(updates)
-    .eq('id', params.id)
+    .eq('id', id)
     .select()
     .single();
 
@@ -99,8 +101,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createClient();
 
   // Check admin access
@@ -123,7 +126,7 @@ export async function DELETE(
   const { data, error } = await supabase
     .from('curriculum_modules')
     .update({ is_active: false })
-    .eq('id', params.id)
+    .eq('id', id)
     .select()
     .single();
 

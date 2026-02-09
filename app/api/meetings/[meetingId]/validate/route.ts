@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 
 export async function POST(
   request: Request,
-  { params }: { params: { meetingId: string } }
+  { params }: { params: Promise<{ meetingId: string }> }
 ) {
+  const { meetingId } = await params;
   const supabase = await createClient();
 
   // Check authentication
@@ -17,7 +18,7 @@ export async function POST(
   const { data: meeting } = await supabase
     .from('meetings')
     .select('id, leader_id, chapter_id, validation_status')
-    .eq('id', params.meetingId)
+    .eq('id', meetingId)
     .single();
 
   if (!meeting) {
@@ -50,7 +51,7 @@ export async function POST(
       leader_validation_notes: notes || null,
       validation_status: 'awaiting_admin',
     })
-    .eq('id', params.meetingId);
+    .eq('id', meetingId);
 
   if (updateError) {
     console.error('Error updating meeting validation:', updateError);
@@ -64,14 +65,14 @@ export async function POST(
       status: 'completed',
       completed_at: now,
     })
-    .eq('related_entity_id', params.meetingId)
+    .eq('related_entity_id', meetingId)
     .eq('task_type', 'validate_meeting')
     .eq('assigned_to', user.id);
 
   // Log to leadership log
   await supabase.from('leadership_log').insert({
     chapter_id: meeting.chapter_id,
-    meeting_id: params.meetingId,
+    meeting_id: meetingId,
     user_id: user.id,
     log_type: 'leader_validated_meeting',
     description: 'Leader validated meeting',
