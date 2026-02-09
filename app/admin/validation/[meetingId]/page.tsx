@@ -6,10 +6,10 @@ import AdminValidationClient from './AdminValidationClient';
 export default async function AdminReviewMeetingPage({
   params,
 }: {
-  params: { meetingId: string };
+  params: Promise<{ meetingId: string }>;
 }) {
+  const { meetingId } = await params;
   const supabase = await createClient();
-  const { meetingId } = params;
 
   // Check admin access
   const { data: { user } } = await supabase.auth.getUser();

@@ -6,10 +6,10 @@ import SequenceEditorClient from './SequenceEditorClient';
 export default async function SequenceEditorPage({
   params,
 }: {
-  params: { sequenceId: string };
+  params: Promise<{ sequenceId: string }>;
 }) {
+  const { sequenceId } = await params;
   const supabase = await createClient();
-  const { sequenceId } = params;
 
   // Check admin access
   const { data: { user } } = await supabase.auth.getUser();

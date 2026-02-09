@@ -6,11 +6,11 @@ export default async function CurriculumResponsesPage({
   params,
   searchParams,
 }: {
-  params: { chapterId: string };
+  params: Promise<{ chapterId: string }>;
   searchParams: { meeting?: string };
 }) {
+  const { chapterId } = await params;
   const supabase = await createClient();
-  const { chapterId } = params;
   const selectedMeetingId = searchParams.meeting;
 
   // Check authentication

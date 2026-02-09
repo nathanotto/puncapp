@@ -6,10 +6,10 @@ import ModuleEditorClient from './ModuleEditorClient';
 export default async function ModuleEditorPage({
   params,
 }: {
-  params: { moduleId: string };
+  params: Promise<{ moduleId: string }>;
 }) {
+  const { moduleId } = await params;
   const supabase = await createClient();
-  const { moduleId } = params;
 
   // Check admin access
   const { data: { user } } = await supabase.auth.getUser();

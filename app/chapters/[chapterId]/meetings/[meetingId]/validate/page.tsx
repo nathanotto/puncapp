@@ -6,10 +6,10 @@ import LeaderValidationClient from './LeaderValidationClient';
 export default async function LeaderValidateMeetingPage({
   params,
 }: {
-  params: { chapterId: string; meetingId: string };
+  params: Promise<{ chapterId: string; meetingId: string }>;
 }) {
+  const { chapterId, meetingId } = await params;
   const supabase = await createClient();
-  const { chapterId, meetingId } = params;
 
   // Check authentication
   const { data: { user } } = await supabase.auth.getUser();
