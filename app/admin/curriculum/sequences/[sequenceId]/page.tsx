@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import SequenceEditorClient from './SequenceEditorClient';
@@ -62,11 +63,14 @@ export default async function SequenceEditorPage({
     .eq('sequence_id', sequenceId)
     .order('order_in_sequence');
 
-  const modules = moduleLinks?.map(link => ({
-    linkId: link.id,
-    order: link.order_in_sequence,
-    ...link.module
-  })) || [];
+  const modules = moduleLinks?.map(link => {
+    const module = normalizeJoin(link.module);
+    return {
+      linkId: link.id,
+      order: link.order_in_sequence,
+      ...module
+    };
+  }).filter(m => m.id) || [];
 
   // Get all active modules for the add dropdown
   const { data: allModules } = await supabase
