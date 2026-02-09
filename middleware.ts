@@ -4,9 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   // Public routes that don't require auth
   const publicRoutes = ['/auth/login', '/auth/signup']
-  if (publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
-    return NextResponse.next()
-  }
+  const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
   let response = NextResponse.next({
     request: { headers: request.headers },
@@ -21,19 +19,29 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({ name, value, ...options })
           response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
+          request.cookies.set({ name, value: '', ...options })
           response.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
+  // Refresh session if needed
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Allow public routes without authentication
+  if (isPublicRoute) {
+    return response
+  }
+
+  // Redirect to login if not authenticated
   if (!user) {
-    return NextResponse.redirect(new URL('/auth/login', request.url))
+    const redirectUrl = new URL('/auth/login', request.url)
+    return NextResponse.redirect(redirectUrl)
   }
 
   // Admin route protection
@@ -45,7 +53,7 @@ export async function middleware(request: NextRequest) {
       .single()
 
     if (!userData?.is_punc_admin) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      return NextResponse.redirect(new URL('/', request.url))
     }
   }
 
