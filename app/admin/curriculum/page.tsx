@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -42,7 +43,14 @@ export default async function CurriculumPage() {
     .eq('is_active', true);
 
   // Find orphan modules (not in any sequence)
-  const linkedModuleIds = new Set(moduleLinks?.map(l => l.module?.id).filter(Boolean));
+  const linkedModuleIds = new Set(
+    moduleLinks
+      ?.map(l => {
+        const module = normalizeJoin(l.module);
+        return module?.id;
+      })
+      .filter(Boolean) || []
+  );
   const orphanModules = allModules?.filter(m => !linkedModuleIds.has(m.id)) || [];
 
   // Group modules by sequence
@@ -50,7 +58,7 @@ export default async function CurriculumPage() {
     ...seq,
     modules: moduleLinks
       ?.filter(link => link.sequence_id === seq.id)
-      .map(link => link.module)
+      .map(link => normalizeJoin(link.module))
       .filter(Boolean) || []
   })) || [];
 
