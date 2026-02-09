@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -64,6 +65,9 @@ export default async function MeetingPage({ params }: MeetingPageProps) {
     );
   }
 
+  const meetingChapter = normalizeJoin(meeting.chapters);
+  const meetingScribe = normalizeJoin(meeting.scribe);
+
   // Get user's chapter memberships for sidebar
   const { data: memberships } = await supabase
     .from('chapter_memberships')
@@ -78,7 +82,8 @@ export default async function MeetingPage({ params }: MeetingPageProps) {
     .eq('user_id', user.id)
     .eq('is_active', true);
 
-  const firstChapter = memberships && memberships.length > 0 ? memberships[0].chapters : null;
+  const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null;
+  const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null;
   const userName = userData?.username || userData?.name || 'Member';
 
   // Check user is member of this specific chapter
@@ -151,10 +156,11 @@ export default async function MeetingPage({ params }: MeetingPageProps) {
 
     // Combine members with their RSVP status
     rsvpData = allMembers?.map(m => {
+      const user = normalizeJoin(m.users);
       const attendance = attendanceList?.find(a => a.user_id === m.user_id);
       return {
         user_id: m.user_id,
-        name: m.users.username || m.users.name,
+        name: user?.username || user?.name,
         role: m.role,
         rsvp_status: attendance?.rsvp_status || 'no_response',
         rsvp_reason: attendance?.rsvp_reason,
@@ -226,11 +232,11 @@ export default async function MeetingPage({ params }: MeetingPageProps) {
       <Sidebar
         userName={userName}
         chapterId={meeting.chapter_id}
-        chapterName={meeting.chapters.name}
+        chapterName={meetingChapter?.name || ''}
       />
       <div className="flex-1">
         <MeetingView
-          meeting={meeting}
+          meeting={{ ...meeting, chapters: meetingChapter, scribe: meetingScribe }}
           meetingDate={meetingDate}
           checkedInAttendance={checkedInAttendance}
           notCheckedInMembers={notCheckedInMembers}

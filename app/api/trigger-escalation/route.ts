@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { sendNotification } from '@/lib/notifications';
 
 export async function POST() {
@@ -39,6 +40,8 @@ export async function POST() {
     console.log(`Found ${meetingsIn3Days?.length || 0} meetings in 3 days`);
 
     for (const meeting of meetingsIn3Days || []) {
+      const chapter = normalizeJoin(meeting.chapters);
+
       // Find non-responders who haven't been reminded yet
       const { data: nonResponders } = await supabase
         .from('attendance')
@@ -47,7 +50,7 @@ export async function POST() {
         .eq('rsvp_status', 'no_response')
         .is('reminder_sent_at', null);
 
-      console.log(`  Meeting ${meeting.chapters.name}: ${nonResponders?.length || 0} non-responders need reminders`);
+      console.log(`  Meeting ${chapter?.name}: ${nonResponders?.length || 0} non-responders need reminders`);
 
       for (const attendance of nonResponders || []) {
         // Send simulated notifications
@@ -55,8 +58,8 @@ export async function POST() {
           recipientUserId: attendance.user_id,
           type: 'email',
           purpose: 'rsvp_reminder',
-          subject: `RSVP needed: ${meeting.chapters.name} meeting on ${meeting.scheduled_date}`,
-          content: `Hey brother, you haven't RSVPed for the upcoming ${meeting.chapters.name} meeting on ${meeting.scheduled_date} at ${meeting.scheduled_time}. Please respond so we know if you'll be there. - PUNC`,
+          subject: `RSVP needed: ${chapter?.name} meeting on ${meeting.scheduled_date}`,
+          content: `Hey brother, you haven't RSVPed for the upcoming ${chapter?.name} meeting on ${meeting.scheduled_date} at ${meeting.scheduled_time}. Please respond so we know if you'll be there. - PUNC`,
           relatedEntityType: 'meeting',
           relatedEntityId: meeting.id,
         });
@@ -65,7 +68,7 @@ export async function POST() {
           recipientUserId: attendance.user_id,
           type: 'sms',
           purpose: 'rsvp_reminder',
-          content: `PUNC: You haven't RSVPed for ${meeting.chapters.name} on ${meeting.scheduled_date}. Please respond!`,
+          content: `PUNC: You haven't RSVPed for ${chapter?.name} on ${meeting.scheduled_date}. Please respond!`,
           relatedEntityType: 'meeting',
           relatedEntityId: meeting.id,
         });
@@ -118,6 +121,8 @@ export async function POST() {
     console.log(`Found ${meetingsIn2Days?.length || 0} meetings in 2 days`);
 
     for (const meeting of meetingsIn2Days || []) {
+      const chapter = normalizeJoin(meeting.chapters);
+
       // Find non-responders (still no response after reminder)
       const { data: stillNoResponse } = await supabase
         .from('attendance')
@@ -136,11 +141,11 @@ export async function POST() {
         .is('leader_outreach_logged_at', null);
 
       if (!stillNoResponse?.length) {
-        console.log(`  Meeting ${meeting.chapters.name}: No unresponsive members`);
+        console.log(`  Meeting ${chapter?.name}: No unresponsive members`);
         continue;
       }
 
-      console.log(`  Meeting ${meeting.chapters.name}: ${stillNoResponse.length} still unresponsive, creating leader tasks...`);
+      console.log(`  Meeting ${chapter?.name}: ${stillNoResponse.length} still unresponsive, creating leader tasks...`);
 
       // Get Leader and Backup Leader for this chapter
       const { data: leaders } = await supabase
@@ -151,7 +156,8 @@ export async function POST() {
 
       // For each non-responder, create task for leaders
       for (const attendance of stillNoResponse) {
-        const memberName = attendance.users.username || attendance.users.name;
+        const user = normalizeJoin(attendance.users);
+        const memberName = user?.username || user?.name;
 
         // Update member's pending task urgency to 'escalated'
         await supabase
@@ -183,10 +189,10 @@ export async function POST() {
               metadata: {
                 member_user_id: attendance.user_id,
                 member_name: memberName,
-                member_phone: attendance.users.phone,
+                member_phone: user?.phone,
                 meeting_id: meeting.id,
                 meeting_date: meeting.scheduled_date,
-                chapter_name: meeting.chapters.name,
+                chapter_name: chapter?.name,
               },
               due_at: meeting.scheduled_date, // Due by meeting day
             });
@@ -197,7 +203,7 @@ export async function POST() {
               type: 'email',
               purpose: 'task_created',
               subject: `Action needed: Contact ${memberName} about RSVP`,
-              content: `${memberName} hasn't responded to the RSVP for ${meeting.chapters.name} on ${meeting.scheduled_date}. Please reach out to check in with them.`,
+              content: `${memberName} hasn't responded to the RSVP for ${chapter?.name} on ${meeting.scheduled_date}. Please reach out to check in with them.`,
               relatedEntityType: 'attendance',
               relatedEntityId: attendance.id,
             });

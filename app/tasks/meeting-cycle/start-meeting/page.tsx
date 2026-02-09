@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import StartMeetingSection from './StartMeetingSection';
@@ -62,6 +63,8 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
     .eq('id', meetingId)
     .single();
 
+  const meetingChapter = meeting ? normalizeJoin(meeting.chapters) : null;
+
   if (meetingError || !meeting) {
     return (
       <div className="min-h-screen bg-warm-cream py-12 px-6">
@@ -76,15 +79,15 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
   }
 
   // Check user is leader or backup leader
-  const { data: membership } = await supabase
-    .from('chapter_memberships')
+  const { data: normalizedMembership } = await supabase
+    .from('chapter_normalizedMemberships')
     .select('role')
     .eq('chapter_id', meeting.chapter_id)
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single();
 
-  if (!membership || !['leader', 'backup_leader'].includes(membership.role)) {
+  if (!normalizedMembership || !['leader', 'backup_leader'].includes(normalizedMembership.role)) {
     return (
       <div className="min-h-screen bg-warm-cream py-12 px-6">
         <div className="max-w-4xl mx-auto">
@@ -122,6 +125,7 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
       checked_in_at,
       attendance_type,
       rsvp_status,
+      rsvp_reason,
       users!attendance_user_id_fkey (
         id,
         name,
@@ -129,6 +133,12 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
       )
     `)
     .eq('meeting_id', meetingId);
+
+  // Normalize joins in attendance
+  const normalizedAttendance = attendanceList?.map(a => ({
+    ...a,
+    users: normalizeJoin(a.users)!
+  }));
 
   // Get chapter members for context
   const { data: members } = await supabase
@@ -145,17 +155,23 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
     .eq('chapter_id', meeting.chapter_id)
     .eq('is_active', true);
 
+  // Normalize joins in members
+  const normalizedMembers = members?.map(m => ({
+    ...m,
+    users: normalizeJoin(m.users)!
+  }));
+
   // Identify who's checked in vs not
   const checkedInUserIds = new Set(
-    attendanceList?.filter(a => a.checked_in_at).map(a => a.user_id) || []
+    normalizedAttendance?.filter(a => a.checked_in_at).map(a => a.user_id) || []
   );
 
-  const checkedInMembers = members?.filter(m => checkedInUserIds.has(m.user_id)) || [];
-  const notCheckedInMembers = members?.filter(m => !checkedInUserIds.has(m.user_id)) || [];
+  const checkedInMembers = normalizedMembers?.filter(m => checkedInUserIds.has(m.user_id)) || [];
+  const notCheckedInMembers = normalizedMembers?.filter(m => !checkedInUserIds.has(m.user_id)) || [];
 
   // Get RSVP info for not checked in members
   const notCheckedInWithRsvp = notCheckedInMembers.map(m => {
-    const attendance = attendanceList?.find(a => a.user_id === m.user_id);
+    const attendance = normalizedAttendance?.find(a => a.user_id === m.user_id);
     return {
       ...m,
       rsvp_status: attendance?.rsvp_status || 'no_response',
@@ -216,7 +232,7 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
             </div>
           </div>
           <h1 className="text-3xl font-bold mb-2">Start Meeting</h1>
-          <p className="text-warm-cream/80">{meeting.chapters.name} • {meetingDate} at {meeting.scheduled_time}</p>
+          <p className="text-warm-cream/80">{meetingChapter?.name} • {meetingDate} at {meeting.scheduled_time}</p>
         </div>
       </header>
 
@@ -261,8 +277,8 @@ export default async function StartMeetingPage({ searchParams }: StartMeetingPag
         {!isTooEarly && (
           <StartMeetingSection
             meetingId={meetingId}
-            initialAttendance={attendanceList || []}
-            allMembers={members || []}
+            initialAttendance={normalizedAttendance || []}
+            allMembers={normalizedMembers || []}
             currentUserId={user.id}
             isLate={isLate}
             minutesLate={minutesDiff}

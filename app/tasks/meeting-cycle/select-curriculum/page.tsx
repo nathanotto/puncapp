@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeJoin } from '@/lib/supabase/utils'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import CurriculumSelectionForm from './CurriculumSelectionForm'
@@ -58,6 +59,8 @@ export default async function SelectCurriculumPage({ searchParams }: SelectCurri
     .eq('id', meetingId)
     .single()
 
+  const meetingChapter = meeting ? normalizeJoin(meeting.chapters) : null;
+
   if (meetingError || !meeting) {
     return (
       <div className="min-h-screen bg-warm-cream py-12 px-6">
@@ -115,6 +118,12 @@ export default async function SelectCurriculumPage({ searchParams }: SelectCurri
     .eq('is_active', true)
     .order('order_in_sequence')
 
+  // Normalize joins in modules
+  const normalizedModules = modules?.map(m => ({
+    ...m,
+    curriculum_sequences: normalizeJoin(m.curriculum_sequences)!
+  }));
+
   if (modulesError) {
     console.error('Error fetching modules:', modulesError)
   }
@@ -139,8 +148,8 @@ export default async function SelectCurriculumPage({ searchParams }: SelectCurri
 
   // Get selected module details if already selected
   let selectedModule = null
-  if (alreadySelected && modules) {
-    selectedModule = modules.find(m => m.id === meeting.selected_curriculum_id)
+  if (alreadySelected && normalizedModules) {
+    selectedModule = normalizedModules.find(m => m.id === meeting.selected_curriculum_id)
   }
 
   return (
@@ -160,7 +169,7 @@ export default async function SelectCurriculumPage({ searchParams }: SelectCurri
             </div>
           </div>
           <h1 className="text-3xl font-bold mb-2">Select Curriculum Module</h1>
-          <p className="text-warm-cream/80">{meeting.chapters.name} • {meetingDate}</p>
+          <p className="text-warm-cream/80">{meetingChapter?.name} • {meetingDate}</p>
         </div>
       </header>
 
@@ -191,10 +200,10 @@ export default async function SelectCurriculumPage({ searchParams }: SelectCurri
         </div>
 
         {/* Curriculum Selection Form */}
-        {modules && modules.length > 0 ? (
+        {normalizedModules && normalizedModules.length > 0 ? (
           <CurriculumSelectionForm
             meetingId={meetingId}
-            modules={modules}
+            modules={normalizedModules}
             completedModuleIds={completedModuleIds}
             selectedModuleId={meeting.selected_curriculum_id || null}
           />

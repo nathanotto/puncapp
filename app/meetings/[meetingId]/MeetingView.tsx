@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import ChangeScribeForm from './ChangeScribeForm';
 
 interface MeetingViewProps {
@@ -61,6 +62,9 @@ export default function MeetingView({
   const [notCheckedInMembers, setNotCheckedInMembers] = useState(initialNotCheckedIn);
   const router = useRouter();
   const supabase = createClient();
+
+  // Normalize meeting joins
+  const meetingChapter = normalizeJoin(meeting.chapters);
 
   console.log('MeetingView rendered, meeting.id:', meeting.id);
 
@@ -185,19 +189,21 @@ export default function MeetingView({
     };
   }, [meeting.id, meeting.chapter_id]);
 
-  const statusColor = {
+  const statusColors = {
     scheduled: 'text-orange-600',
     in_progress: 'text-green-600',
     completed: 'text-blue-600',
     cancelled: 'text-red-600',
-  }[meeting.status] || 'text-stone-gray';
+  } as const;
+  const statusColor = statusColors[meeting.status as keyof typeof statusColors] || 'text-stone-gray';
 
-  const statusText = {
+  const statusTexts = {
     scheduled: 'Scheduled',
     in_progress: 'In Progress',
     completed: 'Completed',
     cancelled: 'Cancelled',
-  }[meeting.status] || meeting.status;
+  } as const;
+  const statusText = statusTexts[meeting.status as keyof typeof statusTexts] || meeting.status;
 
   const scribeName = meeting.scribe?.username || meeting.scribe?.name || 'Not assigned';
 
@@ -221,7 +227,7 @@ export default function MeetingView({
       <main className="max-w-5xl mx-auto py-8 px-8 space-y-6">
         {/* Page Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-earth-brown mb-2">{meeting.chapters.name} Meeting</h1>
+          <h1 className="text-3xl font-bold text-earth-brown mb-2">{meetingChapter?.name} Meeting</h1>
           <p className="text-stone-gray">{meetingDate} at {meeting.scheduled_time}</p>
         </div>
         {/* Meeting Status */}
@@ -393,10 +399,13 @@ export default function MeetingView({
             <ChangeScribeForm
               meetingId={meeting.id}
               currentScribeId={meeting.scribe_id}
-              checkedInMembers={checkedInAttendance.map(a => ({
-                id: a.user_id,
-                name: a.users.username || a.users.name,
-              }))}
+              checkedInMembers={checkedInAttendance.map(a => {
+                const user = normalizeJoin(a.users);
+                return {
+                  id: a.user_id,
+                  name: user?.username || user?.name || '',
+                };
+              })}
             />
           </div>
         )}
@@ -435,7 +444,9 @@ export default function MeetingView({
           <div className="bg-white rounded-lg p-6">
             <h2 className="text-xl font-bold text-earth-brown mb-4">Housekeeping</h2>
             <div className="space-y-4">
-              {housekeepingItems.map((item) => (
+              {housekeepingItems.map((item) => {
+                const itemUser = item.users ? normalizeJoin(item.users) : null;
+                return (
                 <div key={item.id} className="p-4 bg-warm-cream/50 rounded-lg border-l-4 border-burnt-orange">
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-earth-brown">{item.title}</h3>
@@ -446,13 +457,14 @@ export default function MeetingView({
                   {item.notes && (
                     <p className="text-sm text-stone-gray whitespace-pre-wrap">{item.notes}</p>
                   )}
-                  {item.users && (
+                  {itemUser && (
                     <p className="text-xs text-stone-gray mt-2">
-                      Related to: {item.users.username || item.users.name}
+                      Related to: {itemUser.username || itemUser.name}
                     </p>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

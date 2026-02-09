@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeJoin } from '@/lib/supabase/utils'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Sidebar } from '@/components/layout/Sidebar'
 
 export default async function MeetingSummaryPage({
   params,
@@ -12,6 +14,16 @@ export default async function MeetingSummaryPage({
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
+
+  // Get user data for sidebar
+  const { data: userData } = await supabase
+    .from('users')
+    .select('name, username, is_punc_admin')
+    .eq('id', user.id)
+    .single()
+
+  const userName = userData?.name || userData?.username || 'Member'
+  const isAdmin = userData?.is_punc_admin || false
 
   // Get meeting with all related data
   const { data: meeting, error: meetingError } = await supabase
@@ -48,6 +60,9 @@ export default async function MeetingSummaryPage({
       </div>
     )
   }
+
+  const meetingChapter = normalizeJoin(meeting.chapters);
+  const meetingScribe = normalizeJoin(meeting.scribe);
 
   // Check user is member of this chapter
   const { data: membership } = await supabase
@@ -136,9 +151,10 @@ export default async function MeetingSummaryPage({
   const mostValueCounts: Record<string, { name: string; count: number }> = {}
   feedback?.forEach(f => {
     if (!f.skipped_most_value && f.most_value_user_id && f.most_value_user) {
+      const mostValueUser = normalizeJoin(f.most_value_user);
       const key = f.most_value_user_id
       if (!mostValueCounts[key]) {
-        mostValueCounts[key] = { name: f.most_value_user.name, count: 0 }
+        mostValueCounts[key] = { name: mostValueUser?.name || 'Unknown', count: 0 }
       }
       mostValueCounts[key].count++
     }
@@ -189,19 +205,20 @@ export default async function MeetingSummaryPage({
   }
 
   return (
-    <div className="min-h-screen bg-warm-cream">
-      {/* Header */}
-      <header className="bg-deep-charcoal text-warm-cream py-6 px-6">
-        <div className="max-w-4xl mx-auto">
-          <Link href="/" className="text-sm text-warm-cream/80 hover:text-warm-cream mb-4 inline-block">
-            ← Back to Dashboard
-          </Link>
-          <h1 className="text-3xl font-bold mb-2">Meeting Summary</h1>
-          <p className="text-warm-cream/80">{meeting.chapters.name} • {meetingDate}</p>
-        </div>
-      </header>
+    <div className="flex min-h-screen bg-warm-cream">
+      <Sidebar
+        userName={userName}
+        chapterId={meeting.chapter_id}
+        chapterName={meetingChapter?.name}
+        isAdmin={isAdmin}
+      />
 
-      <main className="max-w-4xl mx-auto py-8 px-6">
+      <main className="flex-1 py-8 px-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-earth-brown mb-2">Meeting Summary</h1>
+          <p className="text-stone-gray">{meetingChapter?.name} • {meetingDate}</p>
+        </div>
         {/* Meeting Details */}
         <div className="bg-white rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold text-earth-brown mb-4">Meeting Details</h2>
@@ -228,7 +245,7 @@ export default async function MeetingSummaryPage({
             </div>
             <div>
               <p className="text-sm text-stone-gray">Scribe</p>
-              <p className="font-medium text-earth-brown">{meeting.scribe.name}</p>
+              <p className="font-medium text-earth-brown">{meetingScribe?.name || 'N/A'}</p>
             </div>
             <div>
               <p className="text-sm text-stone-gray">Attendance</p>
@@ -241,17 +258,20 @@ export default async function MeetingSummaryPage({
         <div className="bg-white rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold text-earth-brown mb-4">Attendees ({attendance?.length || 0})</h2>
           <div className="grid grid-cols-2 gap-3">
-            {attendance?.map((a) => (
+            {attendance?.map((a) => {
+              const user = normalizeJoin(a.users);
+              return (
               <div key={a.user_id} className="flex items-center gap-2">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <span className="text-earth-brown">{a.users.name}</span>
+                <span className="text-earth-brown">{user?.name}</span>
                 <span className="text-xs text-stone-gray">({a.attendance_type === 'in_person' ? 'In Person' : 'Video'})</span>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

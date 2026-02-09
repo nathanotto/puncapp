@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import StartMeetingForm from './StartMeetingForm';
 
 interface Member {
@@ -75,7 +76,11 @@ export default function StartMeetingSection({
         console.error('[StartMeeting] Error reloading attendance:', error);
       } else if (data) {
         console.log('[StartMeeting] Updated attendance data:', data.length, 'records');
-        setAttendanceList(data as AttendanceRecord[]);
+        const normalized = data.map(a => ({
+          ...a,
+          users: normalizeJoin(a.users)!
+        }));
+        setAttendanceList(normalized as AttendanceRecord[]);
       }
     };
 
@@ -162,12 +167,15 @@ export default function StartMeetingSection({
           <div className="mb-4">
             <h3 className="font-semibold text-earth-brown mb-2">Checked In:</h3>
             <div className="space-y-1">
-              {checkedInMembers.map(m => (
+              {checkedInMembers.map(m => {
+                const user = normalizeJoin(m.users);
+                return (
                 <div key={m.user_id} className="text-sm text-stone-gray">
-                  • {m.users.username || m.users.name}
+                  • {user?.username || user?.name}
                   {m.role !== 'member' && <span className="text-xs ml-1">({m.role.replace('_', ' ')})</span>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -177,12 +185,15 @@ export default function StartMeetingSection({
           <div className="mb-3">
             <h3 className="font-semibold text-orange-700 mb-2">RSVP'd Yes - Not Checked In Yet ({rsvpYesNotCheckedIn.length}):</h3>
             <div className="space-y-1">
-              {rsvpYesNotCheckedIn.map(m => (
+              {rsvpYesNotCheckedIn.map(m => {
+                const user = normalizeJoin(m.users);
+                return (
                 <div key={m.user_id} className="text-sm text-stone-gray">
-                  • {m.users.username || m.users.name}
+                  • {user?.username || user?.name}
                   {m.role !== 'member' && <span className="text-xs ml-1">({m.role.replace('_', ' ')})</span>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -192,12 +203,15 @@ export default function StartMeetingSection({
           <div className="mb-3">
             <h3 className="font-semibold text-stone-gray mb-2">RSVP'd No ({rsvpNoMembers.length}):</h3>
             <div className="space-y-1">
-              {rsvpNoMembers.map(m => (
+              {rsvpNoMembers.map(m => {
+                const user = normalizeJoin(m.users);
+                return (
                 <div key={m.user_id} className="text-sm text-stone-gray">
-                  • {m.users.username || m.users.name}
+                  • {user?.username || user?.name}
                   {m.rsvp_reason && <span className="text-xs ml-2 italic">({m.rsvp_reason})</span>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -207,12 +221,15 @@ export default function StartMeetingSection({
           <div>
             <h3 className="font-semibold text-red-700 mb-2">No RSVP Response ({noResponseMembers.length}):</h3>
             <div className="space-y-1">
-              {noResponseMembers.map(m => (
+              {noResponseMembers.map(m => {
+                const user = normalizeJoin(m.users);
+                return (
                 <div key={m.user_id} className="text-sm text-stone-gray">
-                  • {m.users.username || m.users.name}
+                  • {user?.username || user?.name}
                   {m.role !== 'member' && <span className="text-xs ml-1">({m.role.replace('_', ' ')})</span>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -233,10 +250,13 @@ export default function StartMeetingSection({
 
         <StartMeetingForm
           meetingId={meetingId}
-          checkedInMembers={checkedInMembers.map(m => ({
-            id: m.user_id,
-            name: m.users.username || m.users.name,
-          }))}
+          checkedInMembers={checkedInMembers.map(m => {
+            const user = normalizeJoin(m.users);
+            return {
+              id: m.user_id,
+              name: user?.username || user?.name || '',
+            };
+          })}
           currentUserId={currentUserId}
           isLate={isLate}
           minutesLate={minutesLate}

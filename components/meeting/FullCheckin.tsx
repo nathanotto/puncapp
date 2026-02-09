@@ -311,7 +311,7 @@ export function FullCheckin({
           isScribe={isScribe}
           section="full_checkins"
           onNext={handleNext}
-          onSkip={() => {}}
+          onSkip={async () => {}}
           onAddTime={handleAddTime}
           onStart={handleStart}
         />

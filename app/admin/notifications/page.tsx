@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import TriggerEscalationButton from '@/components/admin/TriggerEscalationButton';
 
@@ -163,13 +164,16 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
         {/* Notifications List */}
         <div className="space-y-4">
           {notifications && notifications.length > 0 ? (
-            notifications.map((notification) => (
+            notifications.map((notification) => {
+              const user = normalizeJoin(notification.users);
+
+              return (
               <div key={notification.id} className="bg-white rounded-lg p-6 border border-gray-200">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="font-semibold text-earth-brown">
-                        {notification.users?.name || 'Unknown User'}
+                        {user?.name || 'Unknown User'}
                       </h3>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         notification.notification_type === 'email'
@@ -191,7 +195,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                       </span>
                     </div>
                     <p className="text-sm text-stone-gray">
-                      {notification.users?.email}
+                      {user?.email}
                     </p>
                   </div>
                   <div className="text-right text-sm text-stone-gray">
@@ -235,7 +239,8 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                   </div>
                 )}
               </div>
-            ))
+              );
+            })
           ) : (
             <div className="bg-white rounded-lg p-12 text-center">
               <p className="text-stone-gray text-lg">No notifications found</p>

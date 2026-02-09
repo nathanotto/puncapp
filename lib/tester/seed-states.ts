@@ -230,14 +230,20 @@ async function clearDatabase(supabase: SupabaseClient) {
 }
 
 async function seedBaseData(supabase: SupabaseClient) {
-  // Ensure Nathan has tester and admin flags
+  // Ensure Nathan has tester, admin flags, and leader certification
+  const now = new Date();
+  const certExpiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
+
   await supabase
     .from('users')
     .update({
       is_tester: true,
       is_punc_admin: true,
       name: 'Nathan Otto',
-      username: 'notto'
+      username: 'notto',
+      is_leader_certified: true,
+      leader_certified_at: now.toISOString(),
+      leader_certification_expires_at: certExpiry.toISOString(),
     })
     .eq('id', NATHAN_ID);
 
@@ -350,6 +356,37 @@ async function seedThreeChapters(supabase: SupabaseClient) {
   console.log('Starting seedTestUsers...');
   await seedTestUsers(supabase);
   console.log('Completed seedTestUsers');
+
+  // Certify chapter leaders
+  console.log('Certifying chapter leaders...');
+  const now = new Date();
+  const certExpiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
+
+  const orion = TEST_USERS.find(u => u.name === 'Orion Starfield');
+  const prometheus = TEST_USERS.find(u => u.name === 'Prometheus Lightbringer');
+
+  if (orion) {
+    await supabase
+      .from('users')
+      .update({
+        is_leader_certified: true,
+        leader_certified_at: now.toISOString(),
+        leader_certification_expires_at: certExpiry.toISOString(),
+      })
+      .eq('id', orion.id);
+  }
+
+  if (prometheus) {
+    await supabase
+      .from('users')
+      .update({
+        is_leader_certified: true,
+        leader_certified_at: now.toISOString(),
+        leader_certification_expires_at: certExpiry.toISOString(),
+      })
+      .eq('id', prometheus.id);
+  }
+  console.log('Completed certifying leaders');
 
   // Create chapters
   console.log('Creating chapters...');
@@ -507,6 +544,17 @@ async function seedRsvpOneDayOak(supabase: SupabaseClient) {
       } else {
         console.log('Created contact task for', member.name, 'with attendance ID:', attendanceRecord.id);
       }
+
+      // Create leadership log entry for unresponsive member
+      await supabase.from('leadership_log').insert({
+        chapter_id: CHAPTER_IDS.OAK,
+        meeting_id: meetingId,
+        user_id: userId,
+        log_type: 'member_not_contacted',
+        description: `${member.name} did not respond to RSVP by deadline`,
+        metadata: { member_name: member.name },
+        is_resolved: false,
+      });
     }
   }
 }
@@ -590,6 +638,7 @@ async function seedMidMeetingOak(supabase: SupabaseClient) {
   const now = new Date();
 
   // Check in the last person
+  const poseidonId = TEST_USERS.find(u => u.name === 'Poseidon Wavecrest')?.id;
   await supabase
     .from('attendance')
     .update({
@@ -598,7 +647,20 @@ async function seedMidMeetingOak(supabase: SupabaseClient) {
       checked_in_late: true
     })
     .eq('meeting_id', meetingId)
-    .eq('user_id', TEST_USERS.find(u => u.name === 'Poseidon Wavecrest')?.id);
+    .eq('user_id', poseidonId);
+
+  // Create leadership log entry for late check-in
+  if (poseidonId) {
+    await supabase.from('leadership_log').insert({
+      chapter_id: CHAPTER_IDS.OAK,
+      meeting_id: meetingId,
+      user_id: poseidonId,
+      log_type: 'member_checked_in_late',
+      description: 'Poseidon Wavecrest checked in 5 minutes late',
+      metadata: { minutes_late: 5 },
+      is_resolved: false,
+    });
+  }
 
   // Complete opening
   await supabase.from('meeting_time_log').insert([
@@ -742,6 +804,15 @@ async function seedOnboardingQueue(supabase: SupabaseClient) {
 async function seedAdminOverview(supabase: SupabaseClient) {
   await seedThreeChapters(supabase);
 
+  // Flag Pine chapter for attention
+  await supabase
+    .from('chapters')
+    .update({
+      needs_attention: true,
+      attention_reason: 'Multiple members missing meetings, needs leader intervention',
+    })
+    .eq('id', CHAPTER_IDS.PINE);
+
   // Create 3 completed meetings and 2 scheduled for each chapter
   const chapters = [CHAPTER_IDS.OAK, CHAPTER_IDS.PINE, CHAPTER_IDS.ELM];
   const now = new Date();
@@ -794,6 +865,35 @@ async function seedAdminOverview(supabase: SupabaseClient) {
           log_type: 'meeting_started_late',
           description: 'Meeting started 12 minutes late',
           metadata: { minutes_late: 12 },
+          is_resolved: false, // Unresolved issue
+        });
+      }
+
+      // Add some member check-in late issues
+      if (i === 1 && chapterId === CHAPTER_IDS.PINE) {
+        const lateMember = chapterMembers[2]; // Third member
+        await supabase.from('leadership_log').insert({
+          chapter_id: chapterId,
+          meeting_id: meetingId,
+          user_id: lateMember,
+          log_type: 'member_checked_in_late',
+          description: 'Member checked in 8 minutes late',
+          metadata: { minutes_late: 8 },
+          is_resolved: false,
+        });
+      }
+
+      // Add member not contacted issue
+      if (i === 3 && chapterId === CHAPTER_IDS.OAK) {
+        const missingMember = chapterMembers[chapterMembers.length - 1];
+        await supabase.from('leadership_log').insert({
+          chapter_id: chapterId,
+          meeting_id: meetingId,
+          user_id: missingMember,
+          log_type: 'member_not_contacted',
+          description: 'Member did not RSVP and was not contacted before deadline',
+          metadata: {},
+          is_resolved: false,
         });
       }
     }

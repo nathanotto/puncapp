@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import LogOutreachForm from '@/components/rsvp/LogOutreachForm';
@@ -56,6 +57,8 @@ export default async function RSVPSummaryPage({ params }: RSVPSummaryPageProps) 
       </div>
     );
   }
+
+  const meetingChapter = normalizeJoin(meeting.chapters);
 
   // Check if user is a member of this chapter
   const { data: membership } = await supabase
@@ -117,11 +120,14 @@ export default async function RSVPSummaryPage({ params }: RSVPSummaryPageProps) 
   );
 
   // Combine members with their RSVP status
-  const membersWithRsvp = members?.map(m => ({
-    ...m.users,
-    role: m.role,
-    attendance: attendanceMap.get(m.user_id) || { rsvp_status: 'no_response' }
-  })) || [];
+  const membersWithRsvp = members?.map(m => {
+    const user = normalizeJoin(m.users);
+    return {
+      ...user,
+      role: m.role,
+      attendance: attendanceMap.get(m.user_id) || { rsvp_status: 'no_response' }
+    };
+  }) || [];
 
   // Sort: No Response first, then by name
   membersWithRsvp.sort((a, b) => {
@@ -161,7 +167,7 @@ export default async function RSVPSummaryPage({ params }: RSVPSummaryPageProps) 
             </div>
           </div>
           <h1 className="text-3xl font-bold">Meeting RSVPs</h1>
-          <p className="text-warm-cream/80">{meeting.chapters.name}</p>
+          <p className="text-warm-cream/80">{meetingChapter?.name}</p>
         </div>
       </header>
 

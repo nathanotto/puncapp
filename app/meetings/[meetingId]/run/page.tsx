@@ -13,6 +13,7 @@ import {
   addMeetingTime,
   ditchCurriculum,
   submitCurriculumResponse,
+  acceptCurriculumAssignment,
   completeCurriculum,
   submitMeetingFeedback,
   saveAudioMetadata,
@@ -67,11 +68,11 @@ export default async function MeetingRunnerPage({
     .eq('is_active', true)
 
   // Calculate not-checked-in members
-  const checkedInUserIds = new Set(attendees.map(a => a.user_id))
+  const checkedInUserIds = new Set(attendees?.map(a => a.user_id) || [])
   const notCheckedInMembers = allMembers?.filter(m => !checkedInUserIds.has(m.user_id)) || []
 
   // Fetch stretch goals for all attendees
-  const attendeeUserIds = attendees.map(a => a.user_id)
+  const attendeeUserIds = attendees?.map(a => a.user_id) || []
   const { data: stretchGoals } = await supabase
     .from('commitments')
     .select('id, committer_id, description')
@@ -189,6 +190,22 @@ export default async function MeetingRunnerPage({
     await completeCurriculum(meetingId)
   }
 
+  const handleAcceptAssignment = async (dueDate: string) => {
+    'use server'
+    if (!meeting.selected_curriculum_id) {
+      throw new Error('No curriculum module selected')
+    }
+    if (!curriculumModule?.assignment_text) {
+      throw new Error('No assignment available')
+    }
+    await acceptCurriculumAssignment(
+      meetingId,
+      meeting.selected_curriculum_id,
+      curriculumModule.assignment_text,
+      dueDate
+    )
+  }
+
   const handleSubmitFeedback = async (
     rating: number | null,
     mostValueUserId: string | null,
@@ -213,17 +230,17 @@ export default async function MeetingRunnerPage({
   return (
     <MeetingRunnerClient
       initialMeeting={meeting}
-      initialAttendees={attendees}
+      initialAttendees={attendees || []}
       initialNotCheckedIn={notCheckedInMembers}
-      initialTimeLogs={timeLogs}
-      initialCurriculumModule={curriculumModule}
-      initialCurriculumResponses={curriculumResponses}
-      initialMeetingFeedback={meetingFeedback}
-      initialAudioRecording={audioRecording}
-      isScribe={isScribe}
+      initialTimeLogs={timeLogs || []}
+      initialCurriculumModule={curriculumModule || null}
+      initialCurriculumResponses={curriculumResponses || []}
+      initialMeetingFeedback={meetingFeedback || []}
+      initialAudioRecording={audioRecording || null}
+      isScribe={isScribe || false}
       currentUserId={user.id}
       currentUserName={userData?.username || userData?.name || 'Member'}
-      meetingEndTime={meetingEndTime}
+      meetingEndTime={meetingEndTime || new Date()}
       meetingDate={meetingDate}
       stretchGoalsByUser={stretchGoalsByUser}
       onStartTimer={handleStartTimer}
@@ -240,6 +257,7 @@ export default async function MeetingRunnerPage({
       onDitchCurriculum={handleDitchCurriculum}
       onFullCheckinsComplete={handleFullCheckinsComplete}
       onSubmitCurriculumResponse={handleSubmitCurriculumResponse}
+      onAcceptAssignment={handleAcceptAssignment}
       onCurriculumComplete={handleCurriculumComplete}
       onSubmitFeedback={handleSubmitFeedback}
       onSaveAudioMetadata={handleSaveAudioMetadata}

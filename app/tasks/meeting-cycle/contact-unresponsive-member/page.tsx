@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -35,7 +36,8 @@ export default async function ContactUnresponsiveMemberPage() {
     .eq('user_id', user.id)
     .eq('is_active', true);
 
-  const firstChapter = memberships && memberships.length > 0 ? memberships[0].chapters : null;
+  const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null;
+  const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null;
   const userName = userData?.username || userData?.name || 'Member';
 
   // Get all contact_unresponsive_member tasks for this user
@@ -114,8 +116,8 @@ export default async function ContactUnresponsiveMemberPage() {
     })
   );
 
-  // Filter out any null results
-  const holdouts = holdoutsData.filter(Boolean);
+  // Filter out any null results and ensure member and meeting are not null
+  const holdouts = holdoutsData.filter(h => h !== null && h.member !== null && h.meeting !== null) as any;
 
   if (holdouts.length === 0) {
     return (
@@ -138,8 +140,30 @@ export default async function ContactUnresponsiveMemberPage() {
     );
   }
 
-  const meeting = holdouts[0].meeting;
-  const chapterName = meeting?.chapters?.name || 'Chapter';
+  const meeting = holdouts[0]?.meeting;
+  if (!meeting) {
+    return (
+      <div className="flex min-h-screen bg-warm-cream">
+        <Sidebar
+          userName={userName}
+          chapterId={firstChapter?.id}
+          chapterName={firstChapter?.name}
+        />
+        <main className="flex-1 py-8 px-8">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold text-earth-brown mb-4">Contact Tasks</h1>
+            <p className="text-stone-gray mb-4">Unable to load meeting data.</p>
+            <Link href="/" className="text-burnt-orange hover:underline">
+              Back to Dashboard
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const meetingChapter = normalizeJoin(meeting.chapters);
+  const chapterName = meetingChapter?.name || 'Chapter';
   const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`);
   const meetingDate = meetingDateTime.toLocaleDateString('en-US', {
     weekday: 'long',

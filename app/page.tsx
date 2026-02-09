@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import PendingTasksList from '@/components/task/PendingTasksList';
 import { DeleteMeetingButton } from '@/components/meeting/DeleteMeetingButton';
@@ -15,10 +16,10 @@ export default async function HomePage() {
     redirect('/auth/login');
   }
 
-  // Get user's name
+  // Get user's name and admin status
   const { data: userData } = await supabase
     .from('users')
-    .select('name, username')
+    .select('name, username, is_punc_admin')
     .eq('id', user.id)
     .single();
 
@@ -41,8 +42,10 @@ export default async function HomePage() {
   // Create a map of chapter_id -> role for easy lookup
   const userChapterRoles = new Map(memberships?.map(m => [m.chapter_id, m.role]) || []);
 
-  const userName = userData?.username || userData?.name || 'Member'
-  const firstChapter = memberships && memberships.length > 0 ? memberships[0].chapters : null
+  const userName = userData?.name || userData?.username || 'Member'
+  const isAdmin = userData?.is_punc_admin || false
+  const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null
+  const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null
 
   // Helper function to format role display
   const formatRole = (role: string) => {
@@ -145,6 +148,7 @@ export default async function HomePage() {
         userName={userName}
         chapterId={firstChapter?.id}
         chapterName={firstChapter?.name}
+        isAdmin={isAdmin}
       />
 
       {/* Main content */}
@@ -164,6 +168,7 @@ export default async function HomePage() {
         {inProgressMeetings && inProgressMeetings.length > 0 && (
           <div className="mb-8">
             {inProgressMeetings.map(meeting => {
+              const meetingChapter = normalizeJoin(meeting.chapters);
               const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`);
               const startedAt = meeting.actual_start_time
                 ? new Date(meeting.actual_start_time).toLocaleTimeString('en-US', {
@@ -172,7 +177,7 @@ export default async function HomePage() {
                     hour12: true
                   })
                 : null;
-              const userRole = userChapterRoles.get(meeting.chapters.id);
+              const userRole = userChapterRoles.get(meetingChapter?.id);
 
               return (
                 <div key={meeting.id} className="bg-green-50 border-2 border-green-300 rounded-lg p-6 mb-4">
@@ -183,7 +188,7 @@ export default async function HomePage() {
                         <h2 className="text-xl font-bold text-green-900">Meeting In Progress</h2>
                       </div>
                       <p className="text-green-800 font-semibold mb-1">
-                        {meeting.chapters.name}
+                        {meetingChapter?.name}
                         {userRole && <span className="text-sm font-normal text-green-700 ml-2">({formatRole(userRole)})</span>}
                       </p>
                       <p className="text-green-700 text-sm">
@@ -209,6 +214,7 @@ export default async function HomePage() {
             <h2 className="text-2xl font-bold text-earth-brown mb-4">Meetings In Progress</h2>
             <div className="space-y-4">
               {meetingsStartedNotInProgress.map(meeting => {
+                const meetingChapter = normalizeJoin(meeting.chapters);
                 const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`);
                 const dateStr = meetingDateTime.toLocaleDateString('en-US', {
                   weekday: 'short',
@@ -221,7 +227,7 @@ export default async function HomePage() {
                   hour12: true
                 });
 
-                const userRole = userChapterRoles.get(meeting.chapters.id);
+                const userRole = userChapterRoles.get(meetingChapter?.id);
                 const isLeaderOrBackup = userRole === 'leader' || userRole === 'backup_leader';
                 const hasCheckedIn = attendanceMap.has(meeting.id) && attendanceMap.get(meeting.id) !== null;
 
@@ -230,7 +236,7 @@ export default async function HomePage() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <h3 className="font-semibold text-earth-brown">
-                          {meeting.chapters.name}
+                          {meetingChapter?.name}
                           {userRole && <span className="text-sm font-normal text-stone-gray ml-2">({formatRole(userRole)})</span>}
                         </h3>
                         <p className="text-sm text-orange-800">
@@ -280,6 +286,7 @@ export default async function HomePage() {
             <h2 className="text-2xl font-bold text-earth-brown mb-4">Upcoming Meetings</h2>
             <div className="space-y-4">
               {upcomingMeetings.map(meeting => {
+                const meetingChapter = normalizeJoin(meeting.chapters);
                 const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`);
                 const dateStr = meetingDateTime.toLocaleDateString('en-US', {
                   weekday: 'short',
@@ -301,7 +308,7 @@ export default async function HomePage() {
                 const twoDaysBeforeMeeting = new Date(meetingDateTime.getTime() - 2 * 24 * 60 * 60 * 1000);
                 const canDeleteUpcoming = now < twoDaysBeforeMeeting;
 
-                const userRole = userChapterRoles.get(meeting.chapters.id);
+                const userRole = userChapterRoles.get(meetingChapter?.id);
                 const isLeaderOrBackup = userRole === 'leader' || userRole === 'backup_leader';
                 const hasCheckedIn = attendanceMap.has(meeting.id) && attendanceMap.get(meeting.id) !== null;
 
@@ -310,7 +317,7 @@ export default async function HomePage() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <h3 className="font-semibold text-earth-brown">
-                          {meeting.chapters.name}
+                          {meetingChapter?.name}
                           {userRole && <span className="text-sm font-normal text-stone-gray ml-2">({formatRole(userRole)})</span>}
                         </h3>
                         <p className="text-sm text-stone-gray">
@@ -343,14 +350,14 @@ export default async function HomePage() {
                           <>
                             <RescheduleMeetingButton
                               meetingId={meeting.id}
-                              meetingName={meeting.chapters.name}
+                              meetingName={meetingChapter?.name || ''}
                               currentDate={meeting.scheduled_date}
                               currentTime={meeting.scheduled_time}
                             />
                             {canDeleteUpcoming ? (
                               <DeleteMeetingButton
                                 meetingId={meeting.id}
-                                meetingName={meeting.chapters.name}
+                                meetingName={meetingChapter?.name || ''}
                               />
                             ) : (
                               <button
@@ -378,6 +385,7 @@ export default async function HomePage() {
             <h2 className="text-2xl font-bold text-earth-brown mb-4">Past Meetings</h2>
             <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
               {pastMeetings.map(meeting => {
+                const meetingChapter = normalizeJoin(meeting.chapters);
                 const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`);
                 const dateStr = meetingDateTime.toLocaleDateString('en-US', {
                   month: 'short',
@@ -385,22 +393,24 @@ export default async function HomePage() {
                   year: 'numeric'
                 });
 
-                const statusDisplay = {
+                const statusDisplayMap = {
                   completed: 'Completed',
                   incomplete: 'Incomplete',
                   never_started: 'Never Started',
                   timed_out: 'Timed Out'
-                }[meeting.status] || meeting.status;
+                } as const;
+                const statusDisplay = statusDisplayMap[meeting.status as keyof typeof statusDisplayMap] || meeting.status;
 
-                const statusColor = {
+                const statusColorMap = {
                   completed: 'text-green-700',
                   incomplete: 'text-orange-600',
                   never_started: 'text-gray-500',
                   timed_out: 'text-red-600'
-                }[meeting.status] || 'text-gray-600';
+                } as const;
+                const statusColor = statusColorMap[meeting.status as keyof typeof statusColorMap] || 'text-gray-600';
 
                 const isComplete = meeting.status === 'completed';
-                const userRole = userChapterRoles.get(meeting.chapters.id);
+                const userRole = userChapterRoles.get(meetingChapter?.id);
                 const canDelete = userRole === 'leader' || userRole === 'backup_leader';
 
                 return (
@@ -409,7 +419,7 @@ export default async function HomePage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <h3 className="font-semibold text-earth-brown">
-                            {meeting.chapters.name}
+                            {meetingChapter?.name}
                             {userRole && <span className="text-sm font-normal text-stone-gray ml-2">({formatRole(userRole)})</span>}
                           </h3>
                           <span className={`text-xs font-semibold ${statusColor}`}>
@@ -433,7 +443,7 @@ export default async function HomePage() {
                             {canDelete && (
                               <DeleteMeetingButton
                                 meetingId={meeting.id}
-                                meetingName={meeting.chapters.name}
+                                meetingName={meetingChapter?.name || ''}
                               />
                             )}
                           </>

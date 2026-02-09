@@ -8,9 +8,10 @@ interface SidebarProps {
   userName: string
   chapterId?: string
   chapterName?: string
+  isAdmin?: boolean
 }
 
-export function Sidebar({ userName, chapterId, chapterName }: SidebarProps) {
+export function Sidebar({ userName, chapterId, chapterName, isAdmin }: SidebarProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -67,10 +68,19 @@ export function Sidebar({ userName, chapterId, chapterName }: SidebarProps) {
       >
         {/* User info at top */}
         <div className="p-6 border-b border-warm-cream/20">
-          <div className="mb-4 mt-12 lg:mt-0">
+          <div className="mb-4 mt-12 lg:mt-0 relative">
             <p className="text-xl font-bold mb-1">{userName}</p>
             {chapterName && (
               <p className="text-sm text-warm-cream/70">{chapterName}</p>
+            )}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="absolute top-0 right-0 text-xs text-warm-cream/60 hover:text-warm-cream transition-colors"
+                onClick={closeMobileMenu}
+              >
+                Go to admin →
+              </Link>
             )}
           </div>
           <Link
@@ -107,17 +117,6 @@ export function Sidebar({ userName, chapterId, chapterName }: SidebarProps) {
             })}
           </ul>
         </nav>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-warm-cream/20">
-          <Link
-            href="/dashboard"
-            className="text-sm text-warm-cream/60 hover:text-warm-cream"
-            onClick={closeMobileMenu}
-          >
-            ← Back to Dashboard
-          </Link>
-        </div>
       </div>
     </>
   )

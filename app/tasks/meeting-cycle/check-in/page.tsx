@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -108,7 +109,11 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
     .eq('id', meetingId)
     .single();
 
-  const firstChapter = memberships && memberships.length > 0 ? memberships[0].chapters : null;
+  const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null;
+  const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null;
+
+  // Normalize meeting joins
+  const meetingChapter = meeting ? normalizeJoin(meeting.chapters) : null;
 
   if (meetingError || !meeting) {
     return (
@@ -184,7 +189,7 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
       <Sidebar
         userName={userName}
         chapterId={meeting.chapter_id}
-        chapterName={meeting.chapters.name}
+        chapterName={meetingChapter?.name}
       />
 
       <main className="flex-1 py-8 px-8">
@@ -192,7 +197,7 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
           {/* Page Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-earth-brown mb-2">Check In to Meeting</h1>
-            <p className="text-stone-gray">{meeting.chapters.name} • {meetingDate} at {meeting.scheduled_time}</p>
+            <p className="text-stone-gray">{meetingChapter?.name} • {meetingDate} at {meeting.scheduled_time}</p>
           </div>
         {/* Meeting Status */}
         <div className="bg-white rounded-lg p-6 mb-6">

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeJoin } from '@/lib/supabase/utils'
 import { redirect } from 'next/navigation'
 
 export default async function ChapterCurriculumPage({
@@ -56,14 +57,18 @@ export default async function ChapterCurriculumPage({
           <p className="text-stone-gray">No curriculum modules completed yet.</p>
         ) : (
           <div className="space-y-4">
-            {history.map((item) => (
+            {history.map((item) => {
+              const module = normalizeJoin(item.module);
+              const meeting = normalizeJoin(item.meeting);
+
+              return (
               <div
                 key={item.id}
                 className="p-4 bg-warm-cream/50 rounded-lg border-l-4 border-burnt-orange"
               >
                 <div className="flex justify-between items-start mb-2">
                   <span className="px-2 py-1 bg-burnt-orange text-white rounded text-xs font-medium">
-                    Module {item.module.sequence}
+                    Module {module?.sequence}
                   </span>
                   {item.completed_at && (
                     <span className="text-xs text-stone-gray">
@@ -77,16 +82,16 @@ export default async function ChapterCurriculumPage({
                   )}
                 </div>
                 <h3 className="text-lg font-semibold text-earth-brown mb-1">
-                  {item.module.title}
+                  {module?.title}
                 </h3>
                 <p className="text-sm text-stone-gray mb-2">
-                  {item.module.description}
+                  {module?.description}
                 </p>
-                {item.meeting && (
+                {meeting && (
                   <p className="text-xs text-stone-gray">
                     Meeting:{' '}
                     {new Date(
-                      `${item.meeting.scheduled_date}T${item.meeting.scheduled_time}`
+                      `${meeting.scheduled_date}T${meeting.scheduled_time}`
                     ).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -95,7 +100,8 @@ export default async function ChapterCurriculumPage({
                   </p>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

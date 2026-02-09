@@ -463,6 +463,38 @@ export async function submitCurriculumResponse(
   revalidatePath(`/meetings/${meetingId}/run`)
 }
 
+export async function acceptCurriculumAssignment(
+  meetingId: string,
+  moduleId: string,
+  assignmentText: string,
+  dueDate: string
+) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Create commitment for the assignment
+  const { error } = await supabase
+    .from('commitments')
+    .insert({
+      committer_id: user.id,
+      commitment_type: 'curriculum_assignment',
+      description: assignmentText,
+      status: 'active',
+      due_date: dueDate,
+      created_at_meeting_id: meetingId,
+      metadata: { module_id: moduleId },
+    })
+
+  if (error) {
+    console.error('Error creating assignment commitment:', error)
+    throw new Error('Failed to accept assignment')
+  }
+
+  revalidatePath(`/meetings/${meetingId}/run`)
+}
+
 export async function completeCurriculum(meetingId: string) {
   const supabase = await createClient()
 
@@ -472,12 +504,75 @@ export async function completeCurriculum(meetingId: string) {
   // Verify user is scribe
   const { data: meeting } = await supabase
     .from('meetings')
-    .select('scribe_id')
+    .select('scribe_id, chapter_id, selected_curriculum_id')
     .eq('id', meetingId)
     .single()
 
   if (meeting?.scribe_id !== user.id) {
     throw new Error('Only the Scribe can advance sections')
+  }
+
+  const moduleId = meeting.selected_curriculum_id
+
+  if (moduleId) {
+    // Get all attendees who submitted responses
+    const { data: responses } = await supabase
+      .from('curriculum_responses')
+      .select('user_id')
+      .eq('meeting_id', meetingId)
+      .eq('module_id', moduleId)
+
+    const respondentIds = responses?.map(r => r.user_id) || []
+
+    // Track completion for each respondent
+    if (respondentIds.length > 0) {
+      const completions = respondentIds.map(userId => ({
+        user_id: userId,
+        module_id: moduleId,
+        meeting_id: meetingId,
+        completed_at: new Date().toISOString(),
+      }))
+
+      await supabase
+        .from('member_curriculum_completion')
+        .insert(completions)
+    }
+
+    // Get all chapter members
+    const { data: chapterMembers } = await supabase
+      .from('chapter_memberships')
+      .select('user_id')
+      .eq('chapter_id', meeting.chapter_id)
+      .eq('is_active', true)
+
+    const allMemberIds = chapterMembers?.map(m => m.user_id) || []
+
+    // Find non-attendees (members who didn't respond)
+    const nonAttendeeIds = allMemberIds.filter(id => !respondentIds.includes(id))
+
+    // Get module details for task metadata
+    const { data: module } = await supabase
+      .from('curriculum_modules')
+      .select('title')
+      .eq('id', moduleId)
+      .single()
+
+    // Create tasks for non-attendees
+    if (nonAttendeeIds.length > 0) {
+      const tasks = nonAttendeeIds.map(userId => ({
+        task_type: 'complete_curriculum_module',
+        assigned_to: userId,
+        related_entity_type: 'curriculum_module',
+        related_entity_id: moduleId,
+        metadata: {
+          meeting_id: meetingId,
+          chapter_id: meeting.chapter_id,
+          module_title: module?.title || 'Unknown Module',
+        },
+      }))
+
+      await supabase.from('pending_tasks').insert(tasks)
+    }
   }
 
   // Advance to closing section
@@ -571,7 +666,7 @@ export async function completeMeeting(meetingId: string) {
   // Verify user is scribe
   const { data: meeting } = await supabase
     .from('meetings')
-    .select('scribe_id')
+    .select('scribe_id, chapter_id, leader_id')
     .eq('id', meetingId)
     .single()
 
@@ -590,13 +685,14 @@ export async function completeMeeting(meetingId: string) {
     .is('end_time', null)
     .is('user_id', null)
 
-  // Update meeting status to completed
+  // Update meeting status to completed with validation workflow
   const { error: updateError } = await supabase
     .from('meetings')
     .update({
       status: 'completed',
       current_section: 'ended',
       completed_at: now,
+      validation_status: 'awaiting_leader',
     })
     .eq('id', meetingId)
 
@@ -604,6 +700,17 @@ export async function completeMeeting(meetingId: string) {
     console.error('Error completing meeting:', updateError)
     throw new Error('Failed to complete meeting')
   }
+
+  // Create leader validation task
+  const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+  await supabase.from('pending_tasks').insert({
+    task_type: 'validate_meeting',
+    assigned_to: meeting.leader_id,
+    related_entity_type: 'meeting',
+    related_entity_id: meetingId,
+    due_date: dueDate,
+    metadata: { chapter_id: meeting.chapter_id },
+  })
 
   revalidatePath(`/meetings/${meetingId}/run`)
   revalidatePath(`/meetings/${meetingId}`)

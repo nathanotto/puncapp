@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeJoin } from '@/lib/supabase/utils'
 import { redirect } from 'next/navigation'
 
 export default async function ChapterMenPage({
@@ -42,26 +43,29 @@ export default async function ChapterMenPage({
 
       <div className="bg-white rounded-lg shadow p-6 mb-8">
         <div className="space-y-4">
-          {members?.map((member) => (
+          {members?.map((member) => {
+            const user = normalizeJoin(member.users);
+
+            return (
             <div
-              key={member.users.id}
+              key={user?.id}
               className="flex items-center justify-between p-4 bg-warm-cream/50 rounded-lg"
             >
               <div>
                 <p className="font-semibold text-earth-brown">
-                  {member.users.username || member.users.name}
+                  {user?.username || user?.name}
                 </p>
-                {member.users.username && member.users.username !== member.users.name && (
-                  <p className="text-sm text-stone-gray">{member.users.name}</p>
+                {user?.username && user.username !== user.name && (
+                  <p className="text-sm text-stone-gray">{user.name}</p>
                 )}
               </div>
               <span
                 className={`px-3 py-1 rounded text-sm font-medium ${
                   member.role === 'leader'
-                    ? 'bg-sage-green text-deep-charcoal'
+                    ? 'bg-orange-200 text-orange-900'
                     : member.role === 'backup_leader'
-                    ? 'bg-burnt-orange text-white'
-                    : 'bg-gray-200 text-gray-700'
+                    ? 'bg-orange-100 text-orange-800'
+                    : 'bg-orange-50 text-orange-700'
                 }`}
               >
                 {member.role === 'leader'
@@ -71,7 +75,8 @@ export default async function ChapterMenPage({
                   : 'Member'}
               </span>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

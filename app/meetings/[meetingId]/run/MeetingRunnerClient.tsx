@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { normalizeJoin } from '@/lib/supabase/utils'
 import { OpeningSection } from '@/components/meeting/OpeningSection'
 import { LightningRound } from '@/components/meeting/LightningRound'
 import { FullCheckinSection } from '@/components/meeting/FullCheckinSection'
@@ -39,6 +40,7 @@ interface MeetingRunnerClientProps {
   onDitchCurriculum: () => Promise<void>
   onFullCheckinsComplete: () => Promise<void>
   onSubmitCurriculumResponse: (response: string) => Promise<void>
+  onAcceptAssignment: (dueDate: string) => Promise<void>
   onCurriculumComplete: () => Promise<void>
   onSubmitFeedback: (rating: number | null, mostValueUserId: string | null, skipRating: boolean, skipMostValue: boolean) => Promise<void>
   onSaveAudioMetadata: (storagePath: string) => Promise<void>
@@ -74,6 +76,7 @@ export function MeetingRunnerClient({
   onDitchCurriculum,
   onFullCheckinsComplete,
   onSubmitCurriculumResponse,
+  onAcceptAssignment,
   onCurriculumComplete,
   onSubmitFeedback,
   onSaveAudioMetadata,
@@ -504,12 +507,15 @@ export function MeetingRunnerClient({
             {!notCheckedInMembers || notCheckedInMembers.length === 0 ? (
               <p className="text-sm text-orange-700 italic">Everyone is here!</p>
             ) : (
-              notCheckedInMembers.map((member) => (
+              notCheckedInMembers.map((member) => {
+                const user = normalizeJoin(member.users);
+                return (
                 <div key={member.user_id} className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-full border-2 border-orange-400 flex-shrink-0"></div>
-                  <span className="text-sm text-orange-900">{member.users.name}</span>
+                  <span className="text-sm text-orange-900">{user?.name}</span>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -632,7 +638,10 @@ export function MeetingRunnerClient({
             responses={curriculumResponses}
             currentUserId={currentUserId}
             isScribe={currentIsScribe}
+            meetingId={meeting.id}
+            meetingDate={meetingDate}
             onSubmitResponse={onSubmitCurriculumResponse}
+            onAcceptAssignment={onAcceptAssignment}
             onComplete={onCurriculumComplete}
           />
         </>

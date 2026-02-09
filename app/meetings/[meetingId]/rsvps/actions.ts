@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -49,7 +50,10 @@ export async function logOutreachFromRsvpList(formData: FormData): Promise<Actio
     };
   }
 
-  const memberName = attendance.users.username || attendance.users.name;
+  const attendanceUser = normalizeJoin(attendance.users);
+  const attendanceMeeting = normalizeJoin(attendance.meetings);
+
+  const memberName = attendanceUser?.username || attendanceUser?.name;
 
   // Update attendance record with outreach notes
   const { error: updateError } = await supabase

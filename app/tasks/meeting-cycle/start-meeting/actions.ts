@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { normalizeJoin } from '@/lib/supabase/utils';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -46,6 +47,8 @@ export async function startMeeting(formData: FormData): Promise<ActionResult> {
     `)
     .eq('id', meetingId)
     .single();
+
+  const meetingChapter = meeting ? normalizeJoin(meeting.chapters) : null;
 
   if (meetingError || !meeting) {
     return {
@@ -135,7 +138,7 @@ export async function startMeeting(formData: FormData): Promise<ActionResult> {
       related_entity_type: 'meeting',
       related_entity_id: meetingId,
       metadata: {
-        chapter_name: meeting.chapters.name,
+        chapter_name: meetingChapter?.name,
         meeting_date: meeting.scheduled_date,
       },
     }));
@@ -149,7 +152,7 @@ export async function startMeeting(formData: FormData): Promise<ActionResult> {
         notification_type: 'sms',
         purpose: 'meeting_started',
         status: 'simulated',
-        content: `${meeting.chapters.name} meeting has started! Check in now.`,
+        content: `${meetingChapter?.name} meeting has started! Check in now.`,
         related_entity_type: 'meeting',
         related_entity_id: meetingId,
       });

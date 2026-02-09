@@ -36,6 +36,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 
+  // Admin route protection
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_punc_admin')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData?.is_punc_admin) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
   return response
 }
 
