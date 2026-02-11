@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server';
 import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Sidebar } from '@/components/layout/Sidebar';
 import CheckInForm from './CheckInForm';
 import ChangeCheckInTypeLink from './ChangeCheckInTypeLink';
 
@@ -68,28 +67,6 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
     redirect('/auth/login');
   }
 
-  // Get user's name and chapter memberships for sidebar
-  const { data: userData } = await supabase
-    .from('users')
-    .select('name, username')
-    .eq('id', user.id)
-    .single();
-
-  const { data: memberships } = await supabase
-    .from('chapter_memberships')
-    .select(`
-      chapter_id,
-      role,
-      chapters!inner (
-        id,
-        name
-      )
-    `)
-    .eq('user_id', user.id)
-    .eq('is_active', true);
-
-  const userName = userData?.username || userData?.name || 'Member';
-
   // Get meeting with chapter info
   const { data: meeting, error: meetingError } = await supabase
     .from('meetings')
@@ -109,52 +86,37 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
     .eq('id', meetingId)
     .single();
 
-  const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null;
-  const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null;
-
   // Normalize meeting joins
   const meetingChapter = meeting ? normalizeJoin(meeting.chapters) : null;
 
   if (meetingError || !meeting) {
     return (
-      <div className="flex min-h-screen bg-warm-cream">
-        <Sidebar
-          userName={userName}
-          chapterId={firstChapter?.id}
-          chapterName={firstChapter?.name}
-        />
-        <main className="flex-1 py-8 px-8">
-          <div className="max-w-2xl mx-auto">
-            <h1 className="text-2xl font-bold text-earth-brown mb-4">Meeting not found</h1>
-            <Link href="/" className="text-burnt-orange hover:underline">
-              Back to Dashboard
-            </Link>
-          </div>
-        </main>
+      <div className="max-w-2xl mx-auto py-8 px-8">
+        <h1 className="text-2xl font-bold text-earth-brown mb-4">Meeting not found</h1>
+        <Link href="/" className="text-burnt-orange hover:underline">
+          Back to Dashboard
+        </Link>
       </div>
     );
   }
 
   // Check user is member of this chapter
-  const membership = memberships?.find(m => m.chapter_id === meeting.chapter_id);
+  const { data: membership } = await supabase
+    .from('chapter_memberships')
+    .select('role')
+    .eq('chapter_id', meeting.chapter_id)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single();
 
   if (!membership) {
     return (
-      <div className="flex min-h-screen bg-warm-cream">
-        <Sidebar
-          userName={userName}
-          chapterId={firstChapter?.id}
-          chapterName={firstChapter?.name}
-        />
-        <main className="flex-1 py-8 px-8">
-          <div className="max-w-2xl mx-auto">
-            <h1 className="text-2xl font-bold text-earth-brown mb-4">Access denied</h1>
-            <p className="text-stone-gray mb-4">You are not a member of this chapter.</p>
-            <Link href="/" className="text-burnt-orange hover:underline">
-              Back to Dashboard
-            </Link>
-          </div>
-        </main>
+      <div className="max-w-2xl mx-auto py-8 px-8">
+        <h1 className="text-2xl font-bold text-earth-brown mb-4">Access denied</h1>
+        <p className="text-stone-gray mb-4">You are not a member of this chapter.</p>
+        <Link href="/" className="text-burnt-orange hover:underline">
+          Back to Dashboard
+        </Link>
       </div>
     );
   }
@@ -185,14 +147,7 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
   const meetingInProgress = meeting.status === 'in_progress';
 
   return (
-    <div className="flex min-h-screen bg-warm-cream">
-      <Sidebar
-        userName={userName}
-        chapterId={meeting.chapter_id}
-        chapterName={meetingChapter?.name}
-      />
-
-      <main className="flex-1 py-8 px-8">
+    <div className="py-8 px-8">
         <div className="max-w-3xl mx-auto">
           {/* Page Header */}
           <div className="mb-6">
@@ -275,7 +230,6 @@ export default async function CheckInPage({ searchParams }: CheckInPageProps) {
           </div>
         )}
         </div>
-      </main>
     </div>
   );
 }

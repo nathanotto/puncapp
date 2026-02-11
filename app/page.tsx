@@ -16,10 +16,10 @@ export default async function HomePage() {
     redirect('/auth/login');
   }
 
-  // Get user's name and admin status
+  // Get user's name, admin status, and leader certification
   const { data: userData } = await supabase
     .from('users')
-    .select('name, username, is_punc_admin')
+    .select('name, username, is_punc_admin, is_leader_certified')
     .eq('id', user.id)
     .single();
 
@@ -44,6 +44,7 @@ export default async function HomePage() {
 
   const userName = userData?.name || userData?.username || 'Member'
   const isAdmin = userData?.is_punc_admin || false
+  const isLeaderCertified = userData?.is_leader_certified || false
   const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null
   const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null
 
@@ -142,6 +143,26 @@ export default async function HomePage() {
     .order('scheduled_date', { ascending: false })
     .order('scheduled_time', { ascending: false });
 
+  // Get pending opt-ins for this user
+  const { data: pendingOptIns } = await supabase
+    .from('member_opt_ins')
+    .select(`
+      id,
+      opt_in_type,
+      proposed_assignment,
+      notified_at,
+      request:chapter_lifecycle_requests!inner (
+        id,
+        request_type,
+        request_data,
+        chapter_id,
+        chapters (id, name)
+      )
+    `)
+    .eq('user_id', user.id)
+    .eq('status', 'pending')
+    .order('notified_at', { ascending: false });
+
   return (
     <div className="flex min-h-screen bg-warm-cream">
       <Sidebar
@@ -149,6 +170,7 @@ export default async function HomePage() {
         chapterId={firstChapter?.id}
         chapterName={firstChapter?.name}
         isAdmin={isAdmin}
+        isLeaderCertified={isLeaderCertified}
       />
 
       {/* Main content */}
@@ -156,6 +178,64 @@ export default async function HomePage() {
         <div className="max-w-5xl mx-auto">
           <h1 className="text-3xl font-bold text-earth-brown mb-2">Dashboard</h1>
           <p className="text-stone-gray mb-8">Welcome back, {userData?.name || 'Member'}</p>
+
+        {/* Pending Opt-Ins / Invitations */}
+        {pendingOptIns && pendingOptIns.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">🔔</span>
+                <h2 className="text-xl font-bold text-blue-900">
+                  You have {pendingOptIns.length} pending chapter {pendingOptIns.length === 1 ? 'invitation' : 'invitations'}
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {pendingOptIns.map((optIn) => {
+                  const request = normalizeJoin(optIn.request);
+                  const requestData = request?.request_data || {};
+                  const chapter = request?.chapters ? normalizeJoin(request.chapters) : null;
+
+                  let title = '';
+                  let description = '';
+
+                  if (optIn.opt_in_type === 'formation') {
+                    title = requestData.proposed_name || 'New Chapter';
+                    description = 'You\'ve been invited as a founding member';
+                  } else if (optIn.opt_in_type === 'split_existing') {
+                    title = chapter?.name || 'Chapter Split';
+                    description = `Your chapter is splitting. Proposed assignment: ${optIn.proposed_assignment || 'unspecified'}`;
+                  } else if (optIn.opt_in_type === 'split_new') {
+                    title = optIn.proposed_assignment === 'original'
+                      ? (chapter?.name || 'Chapter')
+                      : (requestData.new_chapter_name || 'New Chapter');
+                    description = 'You\'ve been invited to join this chapter';
+                  }
+
+                  return (
+                    <div key={optIn.id} className="bg-white rounded-lg p-4 border border-blue-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-earth-brown">{title}</h3>
+                          <p className="text-sm text-stone-gray mt-1">{description}</p>
+                          <p className="text-xs text-stone-gray mt-1">
+                            Invited {new Date(optIn.notified_at || '').toLocaleDateString()}
+                          </p>
+                        </div>
+                        <a
+                          href={`/requests/opt-in/${optIn.id}`}
+                          className="ml-4 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+                        >
+                          Respond →
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Pending Tasks */}
         <div className="mb-8">
           <h2 className="text-2xl font-semibold text-earth-brown mb-4">

@@ -11,10 +11,12 @@ export default async function AdminDashboardPage() {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'open');
 
-  // Total members
-  const { count: totalMembers } = await supabase
-    .from('users')
-    .select('*', { count: 'exact', head: true });
+  // Chapter members (only users with active chapter memberships)
+  const { data: chapterMemberIds } = await supabase
+    .from('chapter_memberships')
+    .select('user_id')
+    .eq('is_active', true);
+  const chapterMembersCount = new Set(chapterMemberIds?.map(m => m.user_id)).size;
 
   // Unassigned (not in any active membership)
   const { data: assignedUserIds } = await supabase
@@ -42,6 +44,23 @@ export default async function AdminDashboardPage() {
     .limit(5);
 
   const flaggedCount = flaggedChapters?.length || 0;
+
+  // Pending lifecycle requests
+  const { data: pendingRequests } = await supabase
+    .from('chapter_lifecycle_requests')
+    .select(`
+      id,
+      request_type,
+      status,
+      request_data,
+      submitted_at,
+      submitter:users!chapter_lifecycle_requests_submitted_by_fkey (id, name)
+    `)
+    .in('status', ['submitted', 'in_review'])
+    .order('submitted_at', { ascending: false })
+    .limit(5);
+
+  const pendingRequestsCount = pendingRequests?.length || 0;
 
   // Expiring certifications (within 30 days)
   const thirtyDaysFromNow = new Date();
@@ -85,20 +104,20 @@ export default async function AdminDashboardPage() {
             <div className="text-3xl font-bold text-earth-brown">{totalChapters || 0}</div>
           </Link>
 
-          {/* Total Members */}
+          {/* Chapter Members */}
           <Link href="/admin/members" className="bg-white rounded-lg p-6 border border-gray-200 hover:border-sage-green transition-colors">
-            <div className="text-sm text-stone-gray mb-2">Total Members</div>
-            <div className="text-3xl font-bold text-earth-brown">{totalMembers || 0}</div>
+            <div className="text-sm text-stone-gray mb-2">Chapter Members</div>
+            <div className="text-3xl font-bold text-earth-brown">{chapterMembersCount || 0}</div>
           </Link>
 
-          {/* Unassigned */}
+          {/* Unassigned Men */}
           <Link
             href="/admin/members?filter=unassigned"
             className={`bg-white rounded-lg p-6 border-2 transition-colors ${
               unassignedCount > 0 ? 'border-orange-400 hover:border-orange-500' : 'border-gray-200 hover:border-sage-green'
             }`}
           >
-            <div className="text-sm text-stone-gray mb-2">Unassigned</div>
+            <div className="text-sm text-stone-gray mb-2">Unassigned Men</div>
             <div className={`text-3xl font-bold ${unassignedCount > 0 ? 'text-orange-600' : 'text-earth-brown'}`}>
               {unassignedCount}
             </div>
@@ -112,7 +131,63 @@ export default async function AdminDashboardPage() {
         </div>
 
         {/* Action Cards Row */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-3 gap-6 mb-8">
+          {/* Pending Lifecycle Requests Card */}
+          <div className={`bg-white rounded-lg p-6 border-2 transition-colors ${
+            pendingRequestsCount > 0 ? 'border-blue-300 bg-blue-50' : 'border-gray-200'
+          }`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-earth-brown">📋 Lifecycle Requests</h2>
+              {pendingRequestsCount > 0 && (
+                <span className="bg-blue-600 text-white text-sm font-semibold px-3 py-1 rounded-full">
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </div>
+
+            {pendingRequestsCount === 0 ? (
+              <p className="text-stone-gray text-sm">No pending requests</p>
+            ) : (
+              <>
+                <ul className="space-y-2 mb-4">
+                  {pendingRequests?.map((request) => {
+                    const submitter = normalizeJoin(request.submitter);
+                    const typeBadgeMap: Record<string, string> = {
+                      formation: 'bg-purple-100 text-purple-700',
+                      split: 'bg-blue-100 text-blue-700',
+                      dissolution: 'bg-orange-100 text-orange-700'
+                    };
+                    const typeBadge = typeBadgeMap[request.request_type] || 'bg-gray-100 text-gray-700';
+
+                    const name = request.request_type === 'formation'
+                      ? request.request_data.proposed_name
+                      : 'Chapter Request';
+
+                    return (
+                      <li key={request.id} className="text-sm">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${typeBadge}`}>
+                            {request.request_type}
+                          </span>
+                          <Link
+                            href={`/admin/requests/${request.id}`}
+                            className="text-burnt-orange hover:underline font-medium"
+                          >
+                            {name}
+                          </Link>
+                        </div>
+                        <p className="text-stone-gray ml-2">by {submitter?.name}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Link href="/admin/requests?filter=pending" className="text-sm text-burnt-orange hover:underline">
+                  Review All Requests →
+                </Link>
+              </>
+            )}
+          </div>
+
           {/* Chapter Flags Card */}
           <div className="bg-white rounded-lg p-6 border border-gray-200">
             <div className="flex items-center justify-between mb-4">

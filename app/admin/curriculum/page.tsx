@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { normalizeJoin } from '@/lib/supabase/utils';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { RemoveModuleFromSequenceButton } from '@/components/admin/RemoveModuleFromSequenceButton';
 
 export default async function CurriculumPage() {
   const supabase = await createClient();
@@ -168,20 +169,10 @@ export default async function CurriculumPage() {
                           >
                             Edit
                           </Link>
-                          <form action={`/api/admin/curriculum/sequences/${sequence.id}/modules/${module.id}`} method="POST">
-                            <input type="hidden" name="_method" value="DELETE" />
-                            <button
-                              type="submit"
-                              className="text-red-600 hover:underline text-sm"
-                              onClick={(e) => {
-                                if (!confirm('Remove this module from the sequence?')) {
-                                  e.preventDefault();
-                                }
-                              }}
-                            >
-                              Remove
-                            </button>
-                          </form>
+                          <RemoveModuleFromSequenceButton
+                            sequenceId={sequence.id}
+                            moduleId={module.id}
+                          />
                         </div>
                       </div>
                     ))}

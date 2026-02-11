@@ -47,9 +47,10 @@ export default async function ChapterMenPage({
             const user = normalizeJoin(member.users);
 
             return (
-            <div
+            <a
               key={user?.id}
-              className="flex items-center justify-between p-4 bg-warm-cream/50 rounded-lg"
+              href={`/chapters/${chapterId}/men/${user?.id}`}
+              className="flex items-center justify-between p-4 bg-warm-cream/50 rounded-lg hover:bg-warm-cream transition-colors"
             >
               <div>
                 <p className="font-semibold text-earth-brown">
@@ -74,7 +75,7 @@ export default async function ChapterMenPage({
                   ? 'Backup Leader'
                   : 'Member'}
               </span>
-            </div>
+            </a>
             );
           })}
         </div>

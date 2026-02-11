@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server';
 import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Sidebar } from '@/components/layout/Sidebar';
 import ContactActionsClient from './ContactActionsClient';
 
 export default async function ContactUnresponsiveMemberPage() {
@@ -15,31 +14,6 @@ export default async function ContactUnresponsiveMemberPage() {
     redirect('/auth/login');
   }
 
-  // Get user's name and chapter info
-  const { data: userData } = await supabase
-    .from('users')
-    .select('name, username')
-    .eq('id', user.id)
-    .single();
-
-  // Get user's chapter memberships
-  const { data: memberships } = await supabase
-    .from('chapter_memberships')
-    .select(`
-      chapter_id,
-      role,
-      chapters!inner (
-        id,
-        name
-      )
-    `)
-    .eq('user_id', user.id)
-    .eq('is_active', true);
-
-  const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null;
-  const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null;
-  const userName = userData?.username || userData?.name || 'Member';
-
   // Get all contact_unresponsive_member tasks for this user
   const { data: tasks } = await supabase
     .from('pending_tasks')
@@ -50,21 +24,12 @@ export default async function ContactUnresponsiveMemberPage() {
 
   if (!tasks || tasks.length === 0) {
     return (
-      <div className="flex min-h-screen bg-warm-cream">
-        <Sidebar
-          userName={userName}
-          chapterId={firstChapter?.id}
-          chapterName={firstChapter?.name}
-        />
-        <main className="flex-1 py-8 px-8">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold text-earth-brown mb-4">No Contact Tasks</h1>
-            <p className="text-stone-gray mb-4">All members have responded to their RSVPs.</p>
-            <Link href="/" className="text-burnt-orange hover:underline">
-              Back to Dashboard
-            </Link>
-          </div>
-        </main>
+      <div className="max-w-4xl mx-auto py-8 px-8">
+        <h1 className="text-3xl font-bold text-earth-brown mb-4">No Contact Tasks</h1>
+        <p className="text-stone-gray mb-4">All members have responded to their RSVPs.</p>
+        <Link href="/" className="text-burnt-orange hover:underline">
+          Back to Dashboard
+        </Link>
       </div>
     );
   }
@@ -121,21 +86,12 @@ export default async function ContactUnresponsiveMemberPage() {
 
   if (holdouts.length === 0) {
     return (
-      <div className="flex min-h-screen bg-warm-cream">
-        <Sidebar
-          userName={userName}
-          chapterId={firstChapter?.id}
-          chapterName={firstChapter?.name}
-        />
-        <main className="flex-1 py-8 px-8">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold text-earth-brown mb-4">Contact Tasks</h1>
-            <p className="text-stone-gray mb-4">Unable to load member data.</p>
-            <Link href="/" className="text-burnt-orange hover:underline">
-              Back to Dashboard
-            </Link>
-          </div>
-        </main>
+      <div className="max-w-4xl mx-auto py-8 px-8">
+        <h1 className="text-3xl font-bold text-earth-brown mb-4">Contact Tasks</h1>
+        <p className="text-stone-gray mb-4">Unable to load member data.</p>
+        <Link href="/" className="text-burnt-orange hover:underline">
+          Back to Dashboard
+        </Link>
       </div>
     );
   }
@@ -143,21 +99,12 @@ export default async function ContactUnresponsiveMemberPage() {
   const meeting = holdouts[0]?.meeting;
   if (!meeting) {
     return (
-      <div className="flex min-h-screen bg-warm-cream">
-        <Sidebar
-          userName={userName}
-          chapterId={firstChapter?.id}
-          chapterName={firstChapter?.name}
-        />
-        <main className="flex-1 py-8 px-8">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold text-earth-brown mb-4">Contact Tasks</h1>
-            <p className="text-stone-gray mb-4">Unable to load meeting data.</p>
-            <Link href="/" className="text-burnt-orange hover:underline">
-              Back to Dashboard
-            </Link>
-          </div>
-        </main>
+      <div className="max-w-4xl mx-auto py-8 px-8">
+        <h1 className="text-3xl font-bold text-earth-brown mb-4">Contact Tasks</h1>
+        <p className="text-stone-gray mb-4">Unable to load meeting data.</p>
+        <Link href="/" className="text-burnt-orange hover:underline">
+          Back to Dashboard
+        </Link>
       </div>
     );
   }
@@ -173,14 +120,7 @@ export default async function ContactUnresponsiveMemberPage() {
   });
 
   return (
-    <div className="flex min-h-screen bg-warm-cream">
-      <Sidebar
-        userName={userName}
-        chapterId={firstChapter?.id}
-        chapterName={firstChapter?.name}
-      />
-
-      <main className="flex-1 py-8 px-8">
+    <div className="py-8 px-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="mb-8">
@@ -218,7 +158,6 @@ export default async function ContactUnresponsiveMemberPage() {
             <ContactActionsClient holdouts={holdouts} />
           </div>
         </div>
-      </main>
     </div>
   );
 }

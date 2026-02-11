@@ -23,16 +23,9 @@ export default async function AdminLayout({
     .eq('id', user.id)
     .single();
 
-  console.log('[Admin Layout] User data:', userData);
-  console.log('[Admin Layout] User error:', userError);
-  console.log('[Admin Layout] is_punc_admin:', userData?.is_punc_admin);
-
   if (!userData?.is_punc_admin) {
-    console.log('[Admin Layout] Not admin, redirecting to /');
     redirect('/');
   }
-
-  console.log('[Admin Layout] User is admin, rendering admin layout');
 
   const userName = userData.name || userData.username || 'Admin';
 

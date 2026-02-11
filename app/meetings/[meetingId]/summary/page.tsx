@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { normalizeJoin } from '@/lib/supabase/utils'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Sidebar } from '@/components/layout/Sidebar'
 
 export default async function MeetingSummaryPage({
   params,
@@ -14,16 +13,6 @@ export default async function MeetingSummaryPage({
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
-
-  // Get user data for sidebar
-  const { data: userData } = await supabase
-    .from('users')
-    .select('name, username, is_punc_admin')
-    .eq('id', user.id)
-    .single()
-
-  const userName = userData?.name || userData?.username || 'Member'
-  const isAdmin = userData?.is_punc_admin || false
 
   // Get meeting with all related data
   const { data: meeting, error: meetingError } = await supabase
@@ -205,15 +194,7 @@ export default async function MeetingSummaryPage({
   }
 
   return (
-    <div className="flex min-h-screen bg-warm-cream">
-      <Sidebar
-        userName={userName}
-        chapterId={meeting.chapter_id}
-        chapterName={meetingChapter?.name}
-        isAdmin={isAdmin}
-      />
-
-      <main className="flex-1 py-8 px-8">
+    <div className="py-8 px-8">
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-earth-brown mb-2">Meeting Summary</h1>
@@ -354,7 +335,6 @@ export default async function MeetingSummaryPage({
             View Meeting Details
           </Link>
         </div>
-      </main>
     </div>
   )
 }

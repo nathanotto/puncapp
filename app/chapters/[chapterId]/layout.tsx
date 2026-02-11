@@ -19,7 +19,7 @@ export default async function ChapterLayout({
   // Get user data
   const { data: userData } = await supabase
     .from('users')
-    .select('name, username')
+    .select('name, username, is_punc_admin, is_leader_certified')
     .eq('id', user.id)
     .single()
 
@@ -43,7 +43,9 @@ export default async function ChapterLayout({
     redirect('/dashboard')
   }
 
-  const userName = userData?.username || userData?.name || 'Member'
+  const userName = userData?.name || userData?.username || 'Member'
+  const isAdmin = userData?.is_punc_admin || false
+  const isLeaderCertified = userData?.is_leader_certified || false
 
   return (
     <div className="flex min-h-screen bg-warm-cream">
@@ -51,6 +53,8 @@ export default async function ChapterLayout({
         userName={userName}
         chapterId={chapter?.id}
         chapterName={chapter?.name}
+        isAdmin={isAdmin}
+        isLeaderCertified={isLeaderCertified}
       />
       <main className="flex-1">
         {children}

@@ -36,12 +36,14 @@ export function AdminSidebar({ userName }: AdminSidebarProps) {
         { label: 'Chapters', icon: '🏛️', href: '/admin/chapters' },
         { label: 'Members', icon: '👥', href: '/admin/members' },
         { label: 'Curriculum', icon: '📚', href: '/admin/curriculum' },
+        { label: 'Funding', icon: '💰', href: '/admin/funding' },
       ],
     },
     {
       title: 'Review',
       items: [
         { label: 'Meeting Validation', icon: '✅', href: '/admin/validation' },
+        { label: 'Lifecycle Requests', icon: '📋', href: '/admin/requests' },
         { label: 'Chapter Flags', icon: '🚩', href: '/admin/flags' },
       ],
     },

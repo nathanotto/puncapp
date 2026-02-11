@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server';
 import { normalizeJoin } from '@/lib/supabase/utils';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Sidebar } from '@/components/layout/Sidebar';
 import MeetingView from './MeetingView';
 
 interface MeetingPageProps {
@@ -19,13 +18,6 @@ export default async function MeetingPage({ params }: MeetingPageProps) {
   if (authError || !user) {
     redirect('/auth/login');
   }
-
-  // Get user's name
-  const { data: userData } = await supabase
-    .from('users')
-    .select('name, username')
-    .eq('id', user.id)
-    .single();
 
   // Get meeting with chapter info and scribe
   const { data: meeting, error: meetingError } = await supabase
@@ -68,44 +60,23 @@ export default async function MeetingPage({ params }: MeetingPageProps) {
   const meetingChapter = normalizeJoin(meeting.chapters);
   const meetingScribe = normalizeJoin(meeting.scribe);
 
-  // Get user's chapter memberships for sidebar
-  const { data: memberships } = await supabase
+  // Check user is member of this chapter
+  const { data: membership } = await supabase
     .from('chapter_memberships')
-    .select(`
-      chapter_id,
-      role,
-      chapters!inner (
-        id,
-        name
-      )
-    `)
+    .select('role')
+    .eq('chapter_id', meeting.chapter_id)
     .eq('user_id', user.id)
-    .eq('is_active', true);
-
-  const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null;
-  const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null;
-  const userName = userData?.username || userData?.name || 'Member';
-
-  // Check user is member of this specific chapter
-  const membership = memberships?.find(m => m.chapter_id === meeting.chapter_id);
+    .eq('is_active', true)
+    .single();
 
   if (!membership) {
     return (
-      <div className="flex min-h-screen bg-warm-cream">
-        <Sidebar
-          userName={userName}
-          chapterId={firstChapter?.id}
-          chapterName={firstChapter?.name}
-        />
-        <main className="flex-1 py-8 px-8">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold text-earth-brown mb-4">Access denied</h1>
-            <p className="text-stone-gray mb-4">You are not a member of this chapter.</p>
-            <Link href="/" className="text-burnt-orange hover:underline">
-              Back to Dashboard
-            </Link>
-          </div>
-        </main>
+      <div className="max-w-4xl mx-auto py-8 px-8">
+        <h1 className="text-2xl font-bold text-earth-brown mb-4">Access denied</h1>
+        <p className="text-stone-gray mb-4">You are not a member of this chapter.</p>
+        <Link href="/" className="text-burnt-orange hover:underline">
+          Back to Dashboard
+        </Link>
       </div>
     );
   }
@@ -228,27 +199,18 @@ export default async function MeetingPage({ params }: MeetingPageProps) {
   });
 
   return (
-    <div className="flex min-h-screen bg-warm-cream">
-      <Sidebar
-        userName={userName}
-        chapterId={meeting.chapter_id}
-        chapterName={meetingChapter?.name || ''}
-      />
-      <div className="flex-1">
-        <MeetingView
-          meeting={{ ...meeting, chapters: meetingChapter, scribe: meetingScribe }}
-          meetingDate={meetingDate}
-          checkedInAttendance={checkedInAttendance}
-          notCheckedInMembers={notCheckedInMembers}
-          housekeepingItems={housekeepingItems || []}
-          rsvpData={rsvpData}
-          isWithinThreeDays={isWithinThreeDays}
-          isLeader={isLeader}
-          isScribe={isScribe}
-          currentUserId={user.id}
-          currentUserName={userName}
-        />
-      </div>
-    </div>
+    <MeetingView
+      meeting={{ ...meeting, chapters: meetingChapter, scribe: meetingScribe }}
+      meetingDate={meetingDate}
+      checkedInAttendance={checkedInAttendance}
+      notCheckedInMembers={notCheckedInMembers}
+      housekeepingItems={housekeepingItems || []}
+      rsvpData={rsvpData}
+      isWithinThreeDays={isWithinThreeDays}
+      isLeader={isLeader}
+      isScribe={isScribe}
+      currentUserId={user.id}
+      currentUserName={user.id}
+    />
   );
 }
