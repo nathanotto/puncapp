@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { logActivity } from '@/lib/activity-log'
 
 interface RouteContext {
   params: Promise<{ memberId: string }>
@@ -45,6 +46,26 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Failed to certify member' }, { status: 500 })
     }
 
+    // Get member name for activity log
+    const { data: memberData } = await supabase
+      .from('users')
+      .select('name')
+      .eq('id', memberId)
+      .single()
+
+    // Log certification
+    logActivity({
+      actorId: user.id,
+      actorType: 'admin',
+      action: 'admin.leader_certified',
+      entityType: 'user',
+      entityId: memberId,
+      summary: `Admin certified ${memberData?.name || 'member'} as a leader`,
+      details: {
+        expires_at: expiresAt.toISOString(),
+      },
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error in certify route:', error)
@@ -88,6 +109,24 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       console.error('Error revoking certification:', updateError)
       return NextResponse.json({ error: 'Failed to revoke certification' }, { status: 500 })
     }
+
+    // Get member name for activity log
+    const { data: memberData } = await supabase
+      .from('users')
+      .select('name')
+      .eq('id', memberId)
+      .single()
+
+    // Log revocation
+    logActivity({
+      actorId: user.id,
+      actorType: 'admin',
+      action: 'admin.leader_certification_revoked',
+      entityType: 'user',
+      entityId: memberId,
+      summary: `Admin revoked leader certification for ${memberData?.name || 'member'}`,
+      details: {},
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

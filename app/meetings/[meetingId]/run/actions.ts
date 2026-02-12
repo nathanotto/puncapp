@@ -658,6 +658,7 @@ export async function completeMeeting(meetingId: string) {
   'use server'
 
   const { redirect: nextRedirect } = await import('next/navigation')
+  const { logActivity } = await import('@/lib/activity-log')
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -666,7 +667,7 @@ export async function completeMeeting(meetingId: string) {
   // Verify user is scribe
   const { data: meeting } = await supabase
     .from('meetings')
-    .select('scribe_id, chapter_id, leader_id')
+    .select('scribe_id, chapter_id, leader_id, scheduled_date, scheduled_time')
     .eq('id', meetingId)
     .single()
 
@@ -710,6 +711,42 @@ export async function completeMeeting(meetingId: string) {
     related_entity_id: meetingId,
     due_date: dueDate,
     metadata: { chapter_id: meeting.chapter_id },
+  })
+
+  // Get chapter and scribe info for activity log
+  const { data: chapterData } = await supabase
+    .from('chapters')
+    .select('name')
+    .eq('id', meeting.chapter_id)
+    .single()
+
+  const { data: scribeData } = await supabase
+    .from('users')
+    .select('name')
+    .eq('id', user.id)
+    .single()
+
+  // Get attendance count
+  const { count: attendanceCount } = await supabase
+    .from('attendance')
+    .select('*', { count: 'exact', head: true })
+    .eq('meeting_id', meetingId)
+    .not('checked_in_at', 'is', null)
+
+  // Log meeting completion
+  await logActivity({
+    actorId: user.id,
+    action: 'meeting.closed',
+    entityType: 'meeting',
+    entityId: meetingId,
+    chapterId: meeting.chapter_id,
+    summary: `${scribeData?.name || 'Scribe'} closed ${chapterData?.name || 'chapter'} meeting`,
+    details: {
+      scheduled_date: meeting.scheduled_date,
+      scheduled_time: meeting.scheduled_time,
+      completed_at: now,
+      attendance: attendanceCount || 0,
+    },
   })
 
   revalidatePath(`/meetings/${meetingId}/run`)

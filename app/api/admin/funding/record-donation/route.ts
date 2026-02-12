@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity-log';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -65,6 +66,49 @@ export async function POST(request: NextRequest) {
     console.error('Error recording donation:', error);
     return NextResponse.json({ error: 'Failed to record donation' }, { status: 500 });
   }
+
+  // Get chapter names for activity log
+  const { data: recipientChapter } = await supabase
+    .from('chapters')
+    .select('name')
+    .eq('id', chapter_id)
+    .single();
+
+  let donorChapterName = null;
+  if (donor_chapter_id) {
+    const { data: donorChapter } = await supabase
+      .from('chapters')
+      .select('name')
+      .eq('id', donor_chapter_id)
+      .single();
+    donorChapterName = donorChapter?.name;
+  }
+
+  // Log the donation
+  const actionType = transaction_type === 'cross_chapter_donation'
+    ? 'funding.cross_chapter_donation'
+    : 'funding.donation_received';
+
+  const summary = transaction_type === 'cross_chapter_donation'
+    ? `${donorChapterName} donated $${amount.toFixed(2)} to ${recipientChapter?.name}`
+    : `Admin recorded $${amount.toFixed(2)} outside donation to ${recipientChapter?.name}`;
+
+  logActivity({
+    actorId: user.id,
+    actorType: 'admin',
+    action: actionType,
+    entityType: 'funding',
+    entityId: donation.id,
+    chapterId: chapter_id,
+    summary,
+    details: {
+      amount,
+      transaction_type,
+      source_chapter: donorChapterName,
+      target_chapter: recipientChapter?.name,
+      note,
+    },
+  });
 
   return NextResponse.json({ donation });
 }

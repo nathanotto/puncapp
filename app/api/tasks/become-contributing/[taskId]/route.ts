@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity-log';
 
 export async function POST(
   request: Request,
@@ -48,6 +49,32 @@ export async function POST(
         .eq('user_id', user.id);
 
       if (updateError) throw updateError;
+
+      // Get user and chapter names for activity log
+      const { data: userData } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+
+      const { data: chapterData } = await supabase
+        .from('chapters')
+        .select('name')
+        .eq('id', chapterId)
+        .single();
+
+      // Log the event
+      logActivity({
+        actorId: user.id,
+        action: 'member.became_contributing',
+        entityType: 'user',
+        entityId: user.id,
+        chapterId: chapterId,
+        summary: `${userData?.name || 'Member'} became a contributing member of ${chapterData?.name || 'chapter'}`,
+        details: {
+          chapter_name: chapterData?.name,
+        },
+      });
     }
 
     // Mark task complete

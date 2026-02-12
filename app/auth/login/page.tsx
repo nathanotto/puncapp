@@ -1,37 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { login } from '@/app/auth/actions';
 import Link from 'next/link';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (formData: FormData) => {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
+    const result = await login(formData);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
+    if (result?.error) {
+      setError(result.error);
       setLoading(false);
-    } else {
-      // Use hard redirect to ensure cookies are properly set
-      window.location.href = '/dashboard';
     }
+    // If successful, the server action will redirect
   };
 
   return (
@@ -40,16 +28,15 @@ export default function LoginPage() {
         <h1 className="text-3xl font-bold text-earth-brown mb-2">Sign In</h1>
         <p className="text-stone-gray mb-6">Welcome back to PUNCapp</p>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form action={handleLogin} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-earth-brown mb-1">
               Email
             </label>
             <input
               id="email"
+              name="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-burnt-orange focus:border-burnt-orange"
             />
@@ -62,9 +49,8 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 id="password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-burnt-orange focus:border-burnt-orange"
               />

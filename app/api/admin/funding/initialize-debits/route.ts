@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity-log';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -27,10 +28,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'period_month required' }, { status: 400 });
   }
 
-  // Get all open chapters
+  // Get all open chapters with names
   const { data: chapters } = await supabase
     .from('chapters')
-    .select('id')
+    .select('id, name')
     .eq('status', 'open');
 
   if (!chapters || chapters.length === 0) {
@@ -66,6 +67,24 @@ export async function POST(request: NextRequest) {
     console.error('Error initializing debits:', error);
     return NextResponse.json({ error: 'Failed to initialize debits' }, { status: 500 });
   }
+
+  // Log each debit (fire and forget)
+  data.forEach((debit, index) => {
+    const chapter = chapters[index];
+    logActivity({
+      actorId: user.id,
+      actorType: 'admin',
+      action: 'funding.monthly_debit_posted',
+      entityType: 'funding',
+      entityId: debit.id,
+      chapterId: debit.chapter_id,
+      summary: `Monthly $55 debit posted to ${chapter?.name || 'chapter'}`,
+      details: {
+        amount: -55.00,
+        period_month,
+      },
+    });
+  });
 
   return NextResponse.json({ count: data.length, debits: data });
 }

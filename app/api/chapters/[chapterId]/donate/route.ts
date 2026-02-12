@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity-log';
 
 export async function POST(
   request: NextRequest,
@@ -67,6 +68,35 @@ export async function POST(
     console.error('Error recording donation:', error);
     return NextResponse.json({ error: 'Failed to record donation' }, { status: 500 });
   }
+
+  // Get user and chapter names for activity log
+  const { data: userData } = await supabase
+    .from('users')
+    .select('name')
+    .eq('id', user.id)
+    .single();
+
+  const { data: chapterData } = await supabase
+    .from('chapters')
+    .select('name')
+    .eq('id', chapterId)
+    .single();
+
+  // Log the donation (fire and forget)
+  logActivity({
+    actorId: user.id,
+    action: 'funding.donation_received',
+    entityType: 'funding',
+    entityId: donation.id,
+    chapterId: chapterId,
+    summary: `${userData?.name || 'Member'} donated $${amount.toFixed(2)} to ${chapterData?.name || 'chapter'}`,
+    details: {
+      amount,
+      frequency,
+      attribution_type: attribution,
+      donor_member_type: 'contributing',
+    },
+  });
 
   return NextResponse.json({ donation });
 }

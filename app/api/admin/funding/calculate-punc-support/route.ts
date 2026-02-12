@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity-log';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
   // Get current month funding for all open chapters
   const { data: chapters } = await supabase
     .from('chapter_funding_current_month')
-    .select('chapter_id, monthly_cost, contributions_this_month, punc_support_this_month')
+    .select('chapter_id, chapter_name, monthly_cost, contributions_this_month, punc_support_this_month')
     .eq('period_month', period_month);
 
   if (!chapters || chapters.length === 0) {
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
 
   // Calculate support needed for each chapter
   const supportEntries = [];
+  const chaptersNeedingSupport = [];
   let totalSupport = 0;
 
   for (const chapter of chapters) {
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest) {
         amount: gap, // Positive amount (credit to chapter)
         period_month,
       });
+      chaptersNeedingSupport.push({ ...chapter, gap });
       totalSupport += gap;
     }
   }
@@ -70,6 +73,27 @@ export async function POST(request: NextRequest) {
     console.error('Error recording PUNC support:', error);
     return NextResponse.json({ error: 'Failed to record PUNC support' }, { status: 500 });
   }
+
+  // Log each PUNC support entry (fire and forget)
+  data.forEach((supportEntry, index) => {
+    const chapter = chaptersNeedingSupport[index];
+    logActivity({
+      actorId: null,
+      actorType: 'system',
+      action: 'funding.donation_received',
+      entityType: 'funding',
+      entityId: supportEntry.id,
+      chapterId: supportEntry.chapter_id,
+      summary: `PUNC provided $${chapter.gap.toFixed(2)} support to ${chapter.chapter_name}`,
+      details: {
+        amount: chapter.gap,
+        transaction_type: 'punc_support',
+        period_month,
+        contributions_this_month: chapter.contributions_this_month,
+        monthly_cost: chapter.monthly_cost,
+      },
+    });
+  });
 
   return NextResponse.json({
     count: data.length,
