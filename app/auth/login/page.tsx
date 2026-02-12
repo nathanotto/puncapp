@@ -29,8 +29,8 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.push('/dashboard');
-      router.refresh();
+      // Use hard redirect to ensure cookies are properly set
+      window.location.href = '/dashboard';
     }
   };
 

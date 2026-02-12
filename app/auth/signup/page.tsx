@@ -34,9 +34,8 @@ export default function SignupPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      // Redirect to dashboard after successful signup
-      router.push('/dashboard');
-      router.refresh();
+      // Use hard redirect to ensure cookies are properly set
+      window.location.href = '/dashboard';
     }
   };
 
