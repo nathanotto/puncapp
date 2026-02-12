@@ -5,9 +5,11 @@ import { cookies } from 'next/headers';
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json();
+    console.log('[Auth Login] Starting login for:', email);
 
     const cookieStore = await cookies();
     let response = NextResponse.json({ success: true });
+    let cookiesSet = 0;
 
     // Create Supabase client with cookie handlers that set cookies on the response
     const supabase = createServerClient(
@@ -16,12 +18,17 @@ export async function POST(request: Request) {
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll();
+            const allCookies = cookieStore.getAll();
+            console.log('[Auth Login] Getting cookies, count:', allCookies.length);
+            return allCookies;
           },
           setAll(cookiesToSet) {
+            console.log('[Auth Login] setAll called with', cookiesToSet.length, 'cookies');
             // Set cookies on the response object
             cookiesToSet.forEach(({ name, value, options }) => {
+              console.log('[Auth Login] Setting cookie:', name, 'with options:', options);
               response.cookies.set(name, value, options);
+              cookiesSet++;
             });
           },
         },
@@ -34,13 +41,17 @@ export async function POST(request: Request) {
     });
 
     if (error) {
+      console.error('[Auth Login] Auth error:', error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    console.log('[Auth Login] Success! User:', data.user?.email, 'Cookies set:', cookiesSet);
+    console.log('[Auth Login] Response cookies:', response.cookies.getAll());
 
     // Return the response with cookies already set
     return response;
   } catch (error) {
-    console.error('[Auth Login] Error:', error);
+    console.error('[Auth Login] Unexpected error:', error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }
