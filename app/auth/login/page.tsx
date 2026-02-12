@@ -1,25 +1,48 @@
 'use client';
 
 import { useState } from 'react';
-import { login } from '@/app/auth/actions';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const handleLogin = async (formData: FormData) => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const result = await login(formData);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include', // Important: include cookies
+      });
 
-    if (result?.error) {
-      setError(result.error);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Login failed');
+        setLoading(false);
+        return;
+      }
+
+      // Success - redirect to dashboard
+      router.push('/dashboard');
+      router.refresh();
+    } catch (err) {
+      console.error('[Login] Error:', err);
+      setError('An unexpected error occurred');
       setLoading(false);
     }
-    // If successful, the server action will redirect
   };
 
   return (
@@ -28,15 +51,16 @@ export default function LoginPage() {
         <h1 className="text-3xl font-bold text-earth-brown mb-2">Sign In</h1>
         <p className="text-stone-gray mb-6">Welcome back to PUNCapp</p>
 
-        <form action={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-earth-brown mb-1">
               Email
             </label>
             <input
               id="email"
-              name="email"
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-burnt-orange focus:border-burnt-orange"
             />
@@ -49,8 +73,9 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 id="password"
-                name="password"
                 type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-burnt-orange focus:border-burnt-orange"
               />
