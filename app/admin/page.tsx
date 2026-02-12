@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { normalizeJoin } from '@/lib/supabase/utils';
 import Link from 'next/link';
+import { ActivityFeed } from '@/components/admin/ActivityFeed';
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
@@ -90,6 +91,12 @@ export default async function AdminDashboardPage() {
     .eq('is_resolved', false)
     .order('created_at', { ascending: false })
     .limit(5);
+
+  // Get all chapters for activity feed filter
+  const { data: allChapters } = await supabase
+    .from('chapters')
+    .select('id, name')
+    .order('name');
 
   return (
     <div className="p-8">
@@ -302,6 +309,11 @@ export default async function AdminDashboardPage() {
               </tbody>
             </table>
           )}
+        </div>
+
+        {/* Activity Feed */}
+        <div className="mt-8">
+          <ActivityFeed chapters={allChapters || []} />
         </div>
       </div>
     </div>
