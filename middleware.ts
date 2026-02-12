@@ -15,22 +15,22 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
+        getAll() {
+          return request.cookies.getAll()
         },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: '', ...options })
-          response.cookies.set({ name, value: '', ...options })
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set({ name, value, ...options })
+            response.cookies.set({ name, value, ...options })
+          })
         },
       },
     }
   )
 
-  // Refresh session - this is critical for maintaining auth in Vercel
+  // Explicitly refresh the session to ensure cookies are updated
+  // This is critical for maintaining auth across pages in Vercel
+  await supabase.auth.refreshSession()
   const { data: { session } } = await supabase.auth.getSession()
 
   // Allow public routes without authentication
