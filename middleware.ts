@@ -30,8 +30,8 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if needed
-  const { data: { user } } = await supabase.auth.getUser()
+  // Refresh session - this is critical for maintaining auth in Vercel
+  const { data: { session } } = await supabase.auth.getSession()
 
   // Allow public routes without authentication
   if (isPublicRoute) {
@@ -39,10 +39,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect to login if not authenticated
-  if (!user) {
+  if (!session) {
     const redirectUrl = new URL('/auth/login', request.url)
     return NextResponse.redirect(redirectUrl)
   }
+
+  const user = session.user
 
   // Admin route protection
   if (request.nextUrl.pathname.startsWith('/admin')) {
