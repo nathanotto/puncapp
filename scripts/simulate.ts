@@ -909,7 +909,7 @@ async function simulateMeeting(chapter: SimChapter, date: Date) {
 
   // Simulate curriculum response (if chapter has curriculum)
   if (preservedCurriculum.modules.length > 0) {
-    const module = randomChoice(preservedCurriculum.modules);
+    const module = randomChoice(preservedCurriculum.modules) as any;
 
     for (const memberId of attendeeIds) {
       const response = randomChoice(REFLECTIVE_RESPONSES);
