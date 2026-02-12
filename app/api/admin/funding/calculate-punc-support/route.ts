@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
   // Calculate support needed for each chapter
   const supportEntries = [];
-  const chaptersNeedingSupport = [];
+  const chaptersNeedingSupport: Array<typeof chapters[number] & { gap: number }> = [];
   let totalSupport = 0;
 
   for (const chapter of chapters) {
