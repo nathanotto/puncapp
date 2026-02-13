@@ -56,8 +56,14 @@ export async function POST(request: Request) {
     const responseCookies = response.cookies.getAll();
     console.log('[Auth Login] Response cookies:', responseCookies);
 
-    // Just return the original response with cookies already set
-    return response;
+    // Return response with redirect - this ensures cookies are set before redirect
+    return NextResponse.json(
+      { success: true, redirect: '/dashboard' },
+      {
+        status: 200,
+        headers: response.headers,
+      }
+    );
   } catch (error) {
     console.error('[Auth Login] Unexpected error:', error);
     return NextResponse.json(
