@@ -40,6 +40,11 @@ export async function middleware(request: NextRequest) {
 
   console.log('[Middleware] getUser result:', { hasUser: !!user, error: error?.message })
 
+  // Add debug headers
+  supabaseResponse.headers.set('x-debug-has-user', String(!!user))
+  supabaseResponse.headers.set('x-debug-error', error?.message || 'none')
+  supabaseResponse.headers.set('x-debug-cookies-count', String(request.cookies.getAll().length))
+
   // Public routes that don't require auth
   const publicRoutes = ['/auth/login', '/auth/signup']
   const isPublicRoute = publicRoutes.some(route =>
