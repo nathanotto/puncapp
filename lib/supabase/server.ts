@@ -13,14 +13,9 @@ export async function createClient() {
           return cookieStore.getAll()
         },
         setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
-            })
-          } catch (error) {
-            // Log the error so we can see what's failing
-            console.error('[Supabase Server] Failed to set cookies:', error)
-          }
+          // Server Components cannot set cookies - they can only read them.
+          // Cookie setting happens in API routes, Server Actions, and middleware.
+          // Silently ignore this request as per Supabase SSR docs.
         },
       },
     }
