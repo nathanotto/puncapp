@@ -98,6 +98,19 @@ export default async function ChapterOverviewPage({
     .eq('chapter_id', chapterId)
     .eq('is_active', true);
 
+  // Get next upcoming meeting
+  const today = new Date().toISOString().split('T')[0];
+  const { data: nextMeeting } = await supabase
+    .from('meetings')
+    .select('id, scheduled_date, scheduled_time, location, status')
+    .eq('chapter_id', chapterId)
+    .eq('status', 'scheduled')
+    .gte('scheduled_date', today)
+    .order('scheduled_date', { ascending: true })
+    .order('scheduled_time', { ascending: true })
+    .limit(1)
+    .single();
+
   return (
     <div className="p-8">
       <div className="max-w-6xl mx-auto">
@@ -106,6 +119,60 @@ export default async function ChapterOverviewPage({
           <h1 className="text-4xl font-bold text-earth-brown mb-2">{chapter.name}</h1>
           <p className="text-stone-gray">{chapter.meeting_location}</p>
         </div>
+
+        {/* Next Meeting Card */}
+        {nextMeeting && (
+          <div className="bg-burnt-orange/10 border-2 border-burnt-orange rounded-lg p-6 mb-8">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">📅</span>
+                  <h2 className="text-xl font-bold text-earth-brown">Next Meeting</h2>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-earth-brown font-semibold">
+                    {new Date(nextMeeting.scheduled_date).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </p>
+                  <p className="text-stone-gray">
+                    {new Date(`2000-01-01T${nextMeeting.scheduled_time}`).toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })} • {nextMeeting.location}
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/meetings/${nextMeeting.id}`}
+                className="px-6 py-3 bg-burnt-orange text-white font-semibold rounded-lg hover:bg-deep-charcoal transition-colors"
+              >
+                View Details →
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* No Upcoming Meeting Notice (for Leaders) */}
+        {!nextMeeting && isLeader && (
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 mb-8">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <h3 className="font-semibold text-yellow-900 mb-1">No Upcoming Meeting Scheduled</h3>
+                <p className="text-sm text-yellow-800">
+                  Meetings are automatically scheduled based on your chapter's recurring pattern.
+                  The next meeting should appear here soon. If you don't see one within 24 hours,
+                  contact support.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Column */}

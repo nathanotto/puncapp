@@ -160,6 +160,18 @@ export default async function MeetingSummaryPage({
     .eq('meeting_id', meetingId)
     .maybeSingle()
 
+  // Get next upcoming meeting for this chapter
+  const { data: nextMeeting } = await supabase
+    .from('meetings')
+    .select('id, scheduled_date, scheduled_time')
+    .eq('chapter_id', meeting.chapter_id)
+    .eq('status', 'scheduled')
+    .gt('scheduled_date', meeting.scheduled_date)
+    .order('scheduled_date', { ascending: true })
+    .order('scheduled_time', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
   // Format dates
   const meetingDate = new Date(meeting.scheduled_date).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -321,19 +333,27 @@ export default async function MeetingSummaryPage({
         )}
 
         {/* Actions */}
-        <div className="flex gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Link
             href="/"
-            className="flex-1 px-6 py-3 bg-burnt-orange text-white font-semibold rounded-lg text-center hover:bg-deep-charcoal transition-colors"
+            className="px-6 py-3 bg-burnt-orange text-white font-semibold rounded-lg text-center hover:bg-deep-charcoal transition-colors"
           >
             Back to Dashboard
           </Link>
           <Link
             href={`/meetings/${meetingId}`}
-            className="flex-1 px-6 py-3 bg-gray-200 text-earth-brown font-semibold rounded-lg text-center hover:bg-gray-300 transition-colors"
+            className="px-6 py-3 bg-gray-200 text-earth-brown font-semibold rounded-lg text-center hover:bg-gray-300 transition-colors"
           >
             View Meeting Details
           </Link>
+          {nextMeeting && (
+            <Link
+              href={`/meetings/${nextMeeting.id}`}
+              className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg text-center hover:bg-green-700 transition-colors"
+            >
+              View Next Meeting →
+            </Link>
+          )}
         </div>
     </div>
   )
