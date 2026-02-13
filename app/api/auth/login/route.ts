@@ -27,7 +27,14 @@ export async function POST(request: Request) {
             // Set cookies on the response object
             cookiesToSet.forEach(({ name, value, options }) => {
               console.log('[Auth Login] Setting cookie:', name, 'with options:', options);
-              response.cookies.set(name, value, options);
+              // Force secure: true and httpOnly: true for production
+              const secureOptions = {
+                ...options,
+                secure: true,
+                httpOnly: true,
+              };
+              console.log('[Auth Login] Modified options:', secureOptions);
+              response.cookies.set(name, value, secureOptions);
               cookiesSet++;
             });
           },
