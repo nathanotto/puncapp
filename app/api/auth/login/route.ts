@@ -49,21 +49,8 @@ export async function POST(request: Request) {
     const responseCookies = response.cookies.getAll();
     console.log('[Auth Login] Response cookies:', responseCookies);
 
-    // Create new response with debug info but preserve cookies
-    const debugResponse = NextResponse.json({
-      success: true,
-      debug: {
-        cookiesSet,
-        cookieNames: responseCookies.map(c => c.name),
-      }
-    });
-
-    // Copy all cookies from original response to debug response
-    responseCookies.forEach(cookie => {
-      debugResponse.cookies.set(cookie.name, cookie.value);
-    });
-
-    return debugResponse;
+    // Just return the original response with cookies already set
+    return response;
   } catch (error) {
     console.error('[Auth Login] Unexpected error:', error);
     return NextResponse.json(
