@@ -31,7 +31,8 @@ export default async function HomePage() {
       role,
       chapters!inner (
         id,
-        name
+        name,
+        status
       )
     `)
     .eq('user_id', user.id)
