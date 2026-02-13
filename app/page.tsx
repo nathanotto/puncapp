@@ -45,7 +45,27 @@ export default async function HomePage() {
   const userName = userData?.name || userData?.username || 'Member'
   const isAdmin = userData?.is_punc_admin || false
   const isLeaderCertified = userData?.is_leader_certified || false
-  const firstMembership = memberships && memberships.length > 0 ? memberships[0] : null
+
+  // Select primary chapter - prioritize open chapters, then leader roles
+  const firstMembership = memberships && memberships.length > 0
+    ? memberships.sort((a, b) => {
+        const aChapter = normalizeJoin(a.chapters)
+        const bChapter = normalizeJoin(b.chapters)
+
+        // Prioritize open chapters over closed
+        if (aChapter?.status === 'open' && bChapter?.status !== 'open') return -1
+        if (bChapter?.status === 'open' && aChapter?.status !== 'open') return 1
+
+        // Then prioritize leader/backup_leader roles
+        const leaderRoles = ['leader', 'backup_leader']
+        const aIsLeader = leaderRoles.includes(a.role)
+        const bIsLeader = leaderRoles.includes(b.role)
+        if (aIsLeader && !bIsLeader) return -1
+        if (bIsLeader && !aIsLeader) return 1
+
+        return 0
+      })[0]
+    : null
   const firstChapter = firstMembership ? normalizeJoin(firstMembership.chapters) : null
 
   // Helper function to format role display
