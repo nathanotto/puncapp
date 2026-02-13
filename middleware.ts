@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  console.log('[Middleware] Processing:', request.nextUrl.pathname)
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -12,12 +14,16 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll()
+          const cookies = request.cookies.getAll()
+          console.log('[Middleware] getAll called, count:', cookies.length)
+          return cookies
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          console.log('[Middleware] setAll called with', cookiesToSet.length, 'cookies')
+          cookiesToSet.forEach(({ name, value, options }) => {
+            console.log('[Middleware] Setting cookie:', name, 'options:', options)
             supabaseResponse.cookies.set(name, value, options)
-          )
+          })
         },
       },
     }
@@ -29,7 +35,10 @@ export async function middleware(request: NextRequest) {
 
   const {
     data: { user },
+    error
   } = await supabase.auth.getUser()
+
+  console.log('[Middleware] getUser result:', { hasUser: !!user, error: error?.message })
 
   // Public routes that don't require auth
   const publicRoutes = ['/auth/login', '/auth/signup']
