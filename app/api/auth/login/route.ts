@@ -46,10 +46,24 @@ export async function POST(request: Request) {
     }
 
     console.log('[Auth Login] Success! User:', data.user?.email, 'Cookies set:', cookiesSet);
-    console.log('[Auth Login] Response cookies:', response.cookies.getAll());
+    const responseCookies = response.cookies.getAll();
+    console.log('[Auth Login] Response cookies:', responseCookies);
 
-    // Return the response with cookies already set
-    return response;
+    // Create new response with debug info but preserve cookies
+    const debugResponse = NextResponse.json({
+      success: true,
+      debug: {
+        cookiesSet,
+        cookieNames: responseCookies.map(c => c.name),
+      }
+    });
+
+    // Copy all cookies from original response to debug response
+    responseCookies.forEach(cookie => {
+      debugResponse.cookies.set(cookie.name, cookie.value);
+    });
+
+    return debugResponse;
   } catch (error) {
     console.error('[Auth Login] Unexpected error:', error);
     return NextResponse.json(
