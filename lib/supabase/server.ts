@@ -10,12 +10,17 @@ export async function createClient() {
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll()
+          const allCookies = cookieStore.getAll()
+          console.log('[Server Component] getAll - cookies:', allCookies.length, allCookies.map(c => c.name))
+          return allCookies
         },
         setAll(cookiesToSet) {
           // Server Components cannot set cookies - they can only read them.
           // Cookie setting happens in API routes, Server Actions, and middleware.
-          // Silently ignore this request as per Supabase SSR docs.
+          console.log('[Server Component] setAll called with', cookiesToSet.length, 'cookies (IGNORING - read-only context)')
+          if (cookiesToSet.length > 0) {
+            console.log('[Server Component] Cookies that would be set:', cookiesToSet.map(c => `${c.name}=${c.value ? 'EXISTS' : 'EMPTY'}`))
+          }
         },
       },
     }
