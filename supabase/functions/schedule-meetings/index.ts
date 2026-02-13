@@ -95,11 +95,11 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Get all active chapters with recurring schedules
+    // Get all open chapters with recurring schedules
     const { data: chapters, error: chaptersError } = await supabase
       .from('chapters')
       .select('id, name, meeting_frequency, meeting_day_of_week, meeting_time, meeting_location')
-      .eq('status', 'active')
+      .eq('status', 'open')
       .not('meeting_frequency', 'is', null)
       .not('meeting_day_of_week', 'is', null)
       .not('meeting_time', 'is', null)
