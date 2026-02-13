@@ -99,13 +99,15 @@ export function Sidebar({
               </Link>
             )}
           </div>
-          <Link
-            href="/auth/logout"
-            className="text-sm text-black/60 hover:text-black"
-            onClick={closeMobileMenu}
-          >
-            Sign Out →
-          </Link>
+          <form action="/auth/logout" method="POST">
+            <button
+              type="submit"
+              className="text-sm text-black/60 hover:text-black text-left"
+              onClick={closeMobileMenu}
+            >
+              Sign Out →
+            </button>
+          </form>
         </div>
 
         {/* Navigation */}
