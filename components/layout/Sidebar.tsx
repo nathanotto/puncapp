@@ -8,6 +8,7 @@ interface SidebarProps {
   userName: string
   chapterId?: string
   chapterName?: string
+  userRole?: string
   isAdmin?: boolean
   isLeaderCertified?: boolean
   isChapterLeader?: boolean
@@ -18,6 +19,7 @@ export function Sidebar({
   userName,
   chapterId,
   chapterName,
+  userRole,
   isAdmin,
   isLeaderCertified = false,
   isChapterLeader = false,
@@ -30,7 +32,14 @@ export function Sidebar({
     { name: 'Home', href: '/', icon: '🏠' },
     ...(chapterId ? [{ name: 'Chapter', href: `/chapters/${chapterId}`, icon: '🏛️' }] : []),
     { name: 'Meetings', href: chapterId ? `/chapters/${chapterId}/meetings` : '/dashboard', icon: '📅' },
-    { name: 'Men', href: chapterId ? `/chapters/${chapterId}/men` : '#', icon: '👥' },
+    {
+      name: 'Men',
+      href: chapterId ? `/chapters/${chapterId}/men` : '#',
+      icon: '👥',
+      subItems: chapterId ? [
+        { name: 'Messages', href: `/chapters/${chapterId}/messages`, icon: '💬' }
+      ] : []
+    },
     { name: 'Commitments', href: chapterId ? `/chapters/${chapterId}/commitments` : '#', icon: '🎯' },
     { name: 'Curriculum', href: chapterId ? `/chapters/${chapterId}/curriculum` : '#', icon: '📚' },
     { name: 'Requests', href: '/requests', icon: '📋' },
@@ -89,6 +98,17 @@ export function Sidebar({
             {chapterName && (
               <p className="text-sm text-black/70">{chapterName}</p>
             )}
+            {userRole && (
+              <div className="mt-1">
+                <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${
+                  userRole === 'Leader' || userRole === 'Backup Leader'
+                    ? 'bg-sage-green text-black'
+                    : 'bg-black/10 text-black/70'
+                }`}>
+                  {userRole}
+                </span>
+              </div>
+            )}
             {isAdmin && (
               <Link
                 href="/admin"
@@ -115,6 +135,7 @@ export function Sidebar({
           <ul className="space-y-2">
             {navItems.map((item) => {
               const isActive = pathname.startsWith(item.href) && item.href !== '#'
+              const hasSubItems = 'subItems' in item && item.subItems && item.subItems.length > 0
 
               return (
                 <li key={item.name}>
@@ -131,6 +152,32 @@ export function Sidebar({
                     <span className="text-xl">{item.icon}</span>
                     <span>{item.name}</span>
                   </Link>
+
+                  {/* Sub-items */}
+                  {hasSubItems && (
+                    <ul className="mt-1 ml-4 space-y-1">
+                      {item.subItems.map((subItem: any) => {
+                        const isSubActive = pathname === subItem.href
+                        return (
+                          <li key={subItem.name}>
+                            <Link
+                              href={subItem.href}
+                              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm ${
+                                isSubActive
+                                  ? 'bg-sage-green font-semibold'
+                                  : 'hover:bg-warm-cream/20'
+                              }`}
+                              style={{ color: '#000000' }}
+                              onClick={closeMobileMenu}
+                            >
+                              <span>{subItem.icon}</span>
+                              <span>{subItem.name}</span>
+                            </Link>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
                 </li>
               )
             })}
