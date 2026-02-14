@@ -182,6 +182,8 @@ export function CurriculumSection({
     startTransition(async () => {
       try {
         await onComplete()
+        console.log('[CurriculumSection] Curriculum completed, reloading page...')
+        window.location.reload()
       } catch (error) {
         console.error('Error completing curriculum:', error)
         alert('Failed to advance section. Check console for details.')

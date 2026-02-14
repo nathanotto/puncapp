@@ -664,15 +664,59 @@ export async function completeMeeting(meetingId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  // Verify user is scribe
-  const { data: meeting } = await supabase
+  console.log('[completeMeeting] User attempting to complete:', user.id)
+
+  // Get meeting
+  const { data: meeting, error: meetingError } = await supabase
     .from('meetings')
-    .select('scribe_id, chapter_id, leader_id, scheduled_date, scheduled_time')
+    .select('scribe_id, chapter_id, scheduled_date, scheduled_time')
     .eq('id', meetingId)
     .single()
 
-  if (meeting?.scribe_id !== user.id) {
-    throw new Error('Only the Scribe can complete the meeting')
+  if (meetingError) {
+    console.error('[completeMeeting] Error fetching meeting:', meetingError)
+    throw new Error(`Failed to fetch meeting: ${meetingError.message}`)
+  }
+
+  if (!meeting) {
+    console.error('[completeMeeting] Meeting not found:', meetingId)
+    throw new Error('Meeting not found')
+  }
+
+  console.log('[completeMeeting] Meeting data:', meeting)
+
+  // Get leader from chapter_memberships
+  const { data: leaderMembership } = await supabase
+    .from('chapter_memberships')
+    .select('user_id')
+    .eq('chapter_id', meeting.chapter_id)
+    .eq('role', 'leader')
+    .eq('is_active', true)
+    .single()
+
+  const leaderId = leaderMembership?.user_id
+
+  console.log('[completeMeeting] Chapter leader_id:', leaderId)
+  console.log('[completeMeeting] Meeting scribe_id:', meeting.scribe_id)
+  console.log('[completeMeeting] User is scribe:', meeting.scribe_id === user.id)
+
+  // If no scribe is set (testing scenario), set current user as scribe
+  if (!meeting.scribe_id) {
+    console.log('[completeMeeting] No scribe set, setting current user as scribe')
+    const { error: updateError } = await supabase
+      .from('meetings')
+      .update({ scribe_id: user.id })
+      .eq('id', meetingId)
+
+    if (updateError) {
+      console.error('[completeMeeting] Error setting scribe:', updateError)
+      throw new Error(`Failed to set scribe: ${updateError.message}`)
+    }
+
+    // Update local meeting object
+    meeting.scribe_id = user.id
+  } else if (meeting.scribe_id !== user.id) {
+    throw new Error(`Only the Scribe can complete the meeting. Current user: ${user.id}, Scribe: ${meeting.scribe_id}`)
   }
 
   const now = new Date().toISOString()
@@ -702,11 +746,11 @@ export async function completeMeeting(meetingId: string) {
     throw new Error('Failed to complete meeting')
   }
 
-  // Create leader validation task
+  // Create leader validation task (use scribe as fallback if no leader)
   const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
   await supabase.from('pending_tasks').insert({
     task_type: 'validate_meeting',
-    assigned_to: meeting.leader_id,
+    assigned_to: leaderId || user.id,
     related_entity_type: 'meeting',
     related_entity_id: meetingId,
     due_date: dueDate,

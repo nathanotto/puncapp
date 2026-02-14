@@ -28,6 +28,8 @@ export function OpeningSection({
     startTransition(async () => {
       try {
         await onMeditationComplete()
+        console.log('[OpeningSection] Meditation completed, reloading page...')
+        window.location.reload()
       } catch (error) {
         console.error('Error completing meditation:', error)
         alert('Failed to advance section. Check console for details.')
@@ -39,6 +41,8 @@ export function OpeningSection({
     startTransition(async () => {
       try {
         await onEthosComplete()
+        console.log('[OpeningSection] Ethos completed, reloading page...')
+        window.location.reload()
       } catch (error) {
         console.error('Error completing ethos:', error)
         alert('Failed to advance section. Check console for details.')

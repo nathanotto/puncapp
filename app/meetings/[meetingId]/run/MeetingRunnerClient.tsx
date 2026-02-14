@@ -348,7 +348,7 @@ export function MeetingRunnerClient({
       console.log('🔴 Cleaning up real-time subscriptions')
       supabase.removeChannel(channel)
     }
-  }, [meeting.id, supabase])
+  }, [meeting.id])
 
   // Calculate lightning and full checkin logs
   const lightningLogs = timeLogs

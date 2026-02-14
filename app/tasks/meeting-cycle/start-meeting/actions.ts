@@ -87,6 +87,7 @@ export async function startMeeting(formData: FormData): Promise<ActionResult> {
       actual_start_time: now.toISOString(),
       started_late: startedLate,
       scribe_id: scribeId,
+      current_section: 'opening_meditation',
     })
     .eq('id', meetingId);
 

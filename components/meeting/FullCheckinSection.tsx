@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FullCheckinSetup } from './FullCheckinSetup'
 import { FullCheckin } from './FullCheckin'
 
@@ -94,6 +94,29 @@ export function FullCheckinSection({
     setQueue(initialQueue)
     setIsSetupComplete(true)
   }
+
+  // Sync queue's skipped field with fullCheckinLogs whenever logs update
+  useEffect(() => {
+    console.log('[FullCheckinSection] fullCheckinLogs updated:', {
+      logCount: fullCheckinLogs.length,
+      logs: fullCheckinLogs.map(l => ({ user: l.user_id, skipped: l.skipped }))
+    })
+
+    if (isSetupComplete && fullCheckinLogs.length > 0) {
+      setQueue(prevQueue => {
+        const updatedQueue = prevQueue.map(queueItem => {
+          const log = fullCheckinLogs.find(l => l.user_id === queueItem.user_id)
+          if (log) {
+            // Update skipped status from the log
+            return { ...queueItem, skipped: log.skipped }
+          }
+          return queueItem
+        })
+        console.log('[FullCheckinSection] Queue updated')
+        return updatedQueue
+      })
+    }
+  }, [fullCheckinLogs, isSetupComplete])
 
   if (!isSetupComplete) {
     return (

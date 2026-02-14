@@ -1,16 +1,23 @@
 export const PUNC_ETHOS = `The PUNC Ethos
 
-1. Be in brotherhood
-2. Fight hurt
-3. Be dangerous, but not a danger
-4. There are no rules
-5. Your greatest gifts grow in the garden of your wounds
-6. Etc
-7. Etc
-8. Etc
-9. Etc
-10. Etc
-11. Etc
-12. Etc`
+Be Unapologetically Male.
 
-// TODO: Replace with actual Ethos text from Traver Boehm's book
+Be Your Brother's Keeper.
+
+Be Dangerous But Not A Danger.
+
+Make Still The Mind, Make Savage The Body.
+
+Know That Your Deepest Gifts Grow In The Garden Of Your Wounds.
+
+Practice Both Presence & Performance.
+
+Honor The Men Who Came Before You.
+
+Have Equal and Open Access To Your Head, Heart & Balls.
+
+Live By The Rule—There Are No Rules.
+
+Love Fiercely, Openly and Without Reservation.
+
+Show Me Love Without Strength I'll Show You A Victim.`

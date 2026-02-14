@@ -66,7 +66,8 @@ export function FullCheckin({
   onRoundComplete,
   curriculumDitched,
 }: FullCheckinProps) {
-  const [localQueue] = useState(queue)
+  // Use queue prop directly instead of local state
+  const localQueue = queue
 
   // Convert shared timer to Date object
   const startTime = currentTimerStart ? new Date(currentTimerStart) : null
@@ -79,6 +80,14 @@ export function FullCheckin({
 
   const completedUserIds = new Set(completedLogs.map(l => l.user_id))
   const activeQueue = localQueue.filter(q => !q.skipped)
+
+  console.log('[FullCheckin] Render:', {
+    queueLength: localQueue.length,
+    activeQueueLength: activeQueue.length,
+    completedCount: completedUserIds.size,
+    completedUsers: Array.from(completedUserIds),
+    activeUsers: activeQueue.map(q => q.user.name || q.user.username)
+  })
 
   async function handleRoundComplete() {
     console.log('[FullCheckin] handleRoundComplete called');
@@ -93,6 +102,8 @@ export function FullCheckin({
   }
   const currentPerson = activeQueue.find(q => !completedUserIds.has(q.user_id))
   const currentStretchGoal = currentPerson ? stretchGoals[currentPerson.user_id] : null
+
+  console.log('[FullCheckin] Current person:', currentPerson ? (currentPerson.user.name || currentPerson.user.username) : 'NONE')
 
   // Check if round is truly complete: all active queue members have completed
   const allActiveCompleted = activeQueue.length > 0 && activeQueue.every(q => completedUserIds.has(q.user_id))
@@ -140,10 +151,21 @@ export function FullCheckin({
   }
 
   async function handleNext(overtimeSeconds: number) {
-    if (!currentPerson || !startTime) return
+    console.log('[FullCheckin] handleNext called for:', currentPerson ? (currentPerson.user.name || currentPerson.user.username) : 'NONE')
+
+    if (!currentPerson || !startTime) {
+      console.log('[FullCheckin] Missing currentPerson or startTime, returning')
+      return
+    }
 
     const endTime = new Date()
     const durationSeconds = Math.round((endTime.getTime() - startTime.getTime()) / 1000)
+
+    console.log('[FullCheckin] Completing check-in:', {
+      user: currentPerson.user.name || currentPerson.user.username,
+      duration: durationSeconds,
+      overtime: overtimeSeconds
+    })
 
     let finalStretchAction: 'kept' | 'completed' | 'new' | 'none' = 'none'
     let finalNewStretchGoalText: string | undefined
@@ -166,17 +188,28 @@ export function FullCheckin({
       }
     }
 
-    await onPersonComplete(
-      currentPerson.user_id,
-      durationSeconds,
-      overtimeSeconds,
-      finalStretchAction,
-      requestedSupport,
-      finalNewStretchGoalText
-    )
+    try {
+      await onPersonComplete(
+        currentPerson.user_id,
+        durationSeconds,
+        overtimeSeconds,
+        finalStretchAction,
+        requestedSupport,
+        finalNewStretchGoalText
+      )
 
-    // Stop the timer
-    await onStopTimer()
+      console.log('[FullCheckin] onPersonComplete succeeded')
+
+      // Stop the timer
+      await onStopTimer()
+
+      console.log('[FullCheckin] Timer stopped. Reloading page to update queue...')
+      // Force reload to ensure UI updates
+      window.location.reload()
+    } catch (error) {
+      console.error('[FullCheckin] Error in handleNext:', error)
+      alert(`Failed to advance: ${error}`)
+    }
   }
 
   function handleAddTime(seconds: number) {

@@ -123,15 +123,23 @@ export function ClosingSection({
   const handleCompleteMeeting = () => {
     startTransition(async () => {
       try {
+        console.log('[ClosingSection] Calling onCompleteMeeting...')
         await onCompleteMeeting()
+        console.log('[ClosingSection] onCompleteMeeting completed successfully')
         // Redirect is handled by the server action
       } catch (error: any) {
         // Next.js redirect() throws a NEXT_REDIRECT error - this is expected, don't show alert
         if (error?.digest?.startsWith('NEXT_REDIRECT')) {
+          console.log('[ClosingSection] Redirect detected (expected behavior)')
           return
         }
-        console.error('Error completing meeting:', error)
-        alert('Failed to complete meeting. Check console for details.')
+        console.error('[ClosingSection] Error completing meeting:', error)
+        console.error('[ClosingSection] Error details:', {
+          message: error?.message,
+          digest: error?.digest,
+          stack: error?.stack
+        })
+        alert(`Failed to complete meeting: ${error?.message || 'Unknown error'}. Check console for details.`)
       }
     })
   }
