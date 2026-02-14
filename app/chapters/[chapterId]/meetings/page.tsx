@@ -47,10 +47,15 @@ export default async function ChapterMeetingsPage({
               year: 'numeric'
             })
 
+            // Link to summary page for completed meetings, detail page for others
+            const meetingHref = meeting.status === 'completed'
+              ? `/meetings/${meeting.id}/summary`
+              : `/meetings/${meeting.id}`
+
             return (
               <Link
                 key={meeting.id}
-                href={`/meetings/${meeting.id}`}
+                href={meetingHref}
                 className="block bg-white rounded-lg p-6 shadow hover:shadow-md transition-shadow"
               >
                 <div className="flex justify-between items-start">
