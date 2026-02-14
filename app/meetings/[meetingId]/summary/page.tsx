@@ -28,6 +28,10 @@ export default async function MeetingSummaryPage({
       duration_minutes,
       selected_curriculum_id,
       chapter_id,
+      meeting_type,
+      topic,
+      description,
+      message_to_members,
       chapters!inner (
         id,
         name
@@ -87,6 +91,96 @@ export default async function MeetingSummaryPage({
           <Link href={`/meetings/${meetingId}`} className="text-burnt-orange hover:underline">
             Back to Meeting
           </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Special meeting summary (simplified)
+  if (meeting.meeting_type === 'special_consideration') {
+    const meetingDateTime = new Date(`${meeting.scheduled_date}T${meeting.scheduled_time}`)
+    const meetingDate = meetingDateTime.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    })
+
+    return (
+      <div className="min-h-screen bg-warm-cream py-12 px-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <h1 className="text-3xl font-bold text-earth-brown">Special Meeting Summary</h1>
+              <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded">
+                Special Consideration
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-stone-gray">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Chapter</p>
+                <p className="text-lg">{meetingChapter?.name}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Date</p>
+                <p className="text-lg">{meetingDate}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Time</p>
+                <p className="text-lg">{meeting.scheduled_time}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Location</p>
+                <p className="text-lg">{meeting.location || 'Not specified'}</p>
+              </div>
+            </div>
+
+            {meeting.topic && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm font-medium text-gray-500">Topic</p>
+                <p className="text-lg text-stone-gray">{meeting.topic}</p>
+              </div>
+            )}
+
+            {meetingScribe && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm font-medium text-gray-500">Scribe</p>
+                <p className="text-lg text-stone-gray">
+                  {meetingScribe.username || meetingScribe.name}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Meeting Notes */}
+          {meeting.description && (
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-xl font-bold text-earth-brown mb-4">Meeting Notes</h2>
+              <div className="prose max-w-none">
+                <p className="text-stone-gray whitespace-pre-wrap">{meeting.description}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Original Message */}
+          {meeting.message_to_members && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+              <h3 className="font-semibold text-amber-900 mb-2">Original Message to Members</h3>
+              <p className="text-amber-800">{meeting.message_to_members}</p>
+            </div>
+          )}
+
+          {/* Back Link */}
+          <div className="flex justify-center">
+            <Link
+              href={`/chapters/${meeting.chapter_id}/meetings`}
+              className="px-6 py-3 bg-burnt-orange text-white rounded-lg font-semibold hover:bg-deep-charcoal"
+            >
+              Back to Meetings
+            </Link>
+          </div>
         </div>
       </div>
     )

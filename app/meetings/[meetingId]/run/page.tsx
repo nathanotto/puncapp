@@ -20,6 +20,8 @@ import {
   completeMeeting
 } from './actions'
 import { MeetingRunnerClient } from './MeetingRunnerClient'
+import { MeetingAccelerator } from '@/components/tester/MeetingAccelerator'
+import { SpecialMeetingRunner } from '@/components/meeting/SpecialMeetingRunner'
 
 export default async function MeetingRunnerPage({
   params,
@@ -41,10 +43,10 @@ export default async function MeetingRunnerPage({
 
   const { meeting, attendees, timeLogs, isScribe, meetingEndTime, curriculumModule, curriculumResponses, meetingFeedback, audioRecording } = context
 
-  // Get user data for header
+  // Get user data for header and tester status
   const { data: userData } = await supabase
     .from('users')
-    .select('name, username')
+    .select('name, username, is_tester')
     .eq('id', user.id)
     .single()
 
@@ -56,6 +58,52 @@ export default async function MeetingRunnerPage({
     day: 'numeric',
     year: 'numeric'
   })
+
+  // Handle special meetings with simplified flow
+  if (meeting.meeting_type === 'special_consideration') {
+    const handleStartSpecialMeeting = async () => {
+      'use server'
+      const supabase = await createClient()
+      await supabase
+        .from('meetings')
+        .update({
+          status: 'in_progress',
+          actual_start_time: new Date().toISOString(),
+        })
+        .eq('id', meetingId)
+    }
+
+    const handleCompleteSpecialMeeting = async (notes: string) => {
+      'use server'
+      const supabase = await createClient()
+      const now = new Date().toISOString()
+
+      // Update meeting with notes in description field
+      await supabase
+        .from('meetings')
+        .update({
+          status: 'completed',
+          completed_at: now,
+          description: notes,
+        })
+        .eq('id', meetingId)
+
+      // Redirect to summary
+      const { redirect: nextRedirect } = await import('next/navigation')
+      nextRedirect(`/meetings/${meetingId}/summary`)
+    }
+
+    return (
+      <SpecialMeetingRunner
+        meeting={meeting}
+        isScribe={isScribe || false}
+        currentUserId={user.id}
+        meetingDate={meetingDate}
+        onStartMeeting={handleStartSpecialMeeting}
+        onCompleteMeeting={handleCompleteSpecialMeeting}
+      />
+    )
+  }
 
   // Get all chapter members
   const { data: allMembers } = await supabase
@@ -228,40 +276,45 @@ export default async function MeetingRunnerPage({
   }
 
   return (
-    <MeetingRunnerClient
-      initialMeeting={meeting}
-      initialAttendees={attendees || []}
-      initialNotCheckedIn={notCheckedInMembers}
-      initialTimeLogs={timeLogs || []}
-      initialCurriculumModule={curriculumModule || null}
-      initialCurriculumResponses={curriculumResponses || []}
-      initialMeetingFeedback={meetingFeedback || []}
-      initialAudioRecording={audioRecording || null}
-      isScribe={isScribe || false}
-      currentUserId={user.id}
-      currentUserName={userData?.username || userData?.name || 'Member'}
-      meetingEndTime={meetingEndTime || new Date()}
-      meetingDate={meetingDate}
-      stretchGoalsByUser={stretchGoalsByUser}
-      onStartTimer={handleStartTimer}
-      onStopTimer={handleStopTimer}
-      onChangeScribe={handleChangeScribe}
-      onMeditationComplete={handleMeditationComplete}
-      onEthosComplete={handleEthosComplete}
-      onLightningComplete={handleLightningComplete}
-      onPersonComplete={handlePersonComplete}
-      onPersonSkip={handlePersonSkip}
-      onFullCheckinComplete={handleFullCheckinComplete}
-      onFullCheckinSkip={handleFullCheckinSkip}
-      onAddMeetingTime={handleAddMeetingTime}
-      onDitchCurriculum={handleDitchCurriculum}
-      onFullCheckinsComplete={handleFullCheckinsComplete}
-      onSubmitCurriculumResponse={handleSubmitCurriculumResponse}
-      onAcceptAssignment={handleAcceptAssignment}
-      onCurriculumComplete={handleCurriculumComplete}
-      onSubmitFeedback={handleSubmitFeedback}
-      onSaveAudioMetadata={handleSaveAudioMetadata}
-      onCompleteMeeting={handleCompleteMeeting}
-    />
+    <>
+      <MeetingRunnerClient
+        initialMeeting={meeting}
+        initialAttendees={attendees || []}
+        initialNotCheckedIn={notCheckedInMembers}
+        initialTimeLogs={timeLogs || []}
+        initialCurriculumModule={curriculumModule || null}
+        initialCurriculumResponses={curriculumResponses || []}
+        initialMeetingFeedback={meetingFeedback || []}
+        initialAudioRecording={audioRecording || null}
+        isScribe={isScribe || false}
+        currentUserId={user.id}
+        currentUserName={userData?.username || userData?.name || 'Member'}
+        meetingEndTime={meetingEndTime || new Date()}
+        meetingDate={meetingDate}
+        stretchGoalsByUser={stretchGoalsByUser}
+        onStartTimer={handleStartTimer}
+        onStopTimer={handleStopTimer}
+        onChangeScribe={handleChangeScribe}
+        onMeditationComplete={handleMeditationComplete}
+        onEthosComplete={handleEthosComplete}
+        onLightningComplete={handleLightningComplete}
+        onPersonComplete={handlePersonComplete}
+        onPersonSkip={handlePersonSkip}
+        onFullCheckinComplete={handleFullCheckinComplete}
+        onFullCheckinSkip={handleFullCheckinSkip}
+        onAddMeetingTime={handleAddMeetingTime}
+        onDitchCurriculum={handleDitchCurriculum}
+        onFullCheckinsComplete={handleFullCheckinsComplete}
+        onSubmitCurriculumResponse={handleSubmitCurriculumResponse}
+        onAcceptAssignment={handleAcceptAssignment}
+        onCurriculumComplete={handleCurriculumComplete}
+        onSubmitFeedback={handleSubmitFeedback}
+        onSaveAudioMetadata={handleSaveAudioMetadata}
+        onCompleteMeeting={handleCompleteMeeting}
+      />
+
+      {/* Meeting Accelerator for testers */}
+      {userData?.is_tester && <MeetingAccelerator meetingId={meetingId} />}
+    </>
   )
 }
